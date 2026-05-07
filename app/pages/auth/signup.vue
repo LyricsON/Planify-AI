@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
+import { reactive, ref } from 'vue'
 
 definePageMeta({
   layout: 'auth'
@@ -27,12 +27,11 @@ const onSubmit = async () => {
     return
   }
   if (!form.terms) {
-    alert("Please agree to the Terms of Service")
+    alert('Please agree to the Terms of Service')
     return
   }
-  
+
   isLoading.value = true
-  // Mock API call
   await new Promise(resolve => setTimeout(resolve, 500))
   console.log('Sign up payload:', form)
   isLoading.value = false
@@ -40,194 +39,158 @@ const onSubmit = async () => {
 </script>
 
 <template>
-  <div class="flex min-h-screen">
-    <!-- Left Panel (Brand & Info) -->
-    <div class="hidden lg:flex w-[48%] relative">
-      <div class="absolute inset-0 bg-gradient-to-br from-[var(--color-primary-soft)] to-[var(--color-bg)] opacity-50 z-0"></div>
-      <div class="relative z-10 w-full">
-        <AuthBrandPanel mode="signup" />
-      </div>
-    </div>
-
-    <!-- Right Panel (Form) -->
-    <div class="flex-1 flex flex-col justify-center items-center p-6 sm:p-8 w-full lg:w-[52%] overflow-y-auto">
-      
-      <!-- Mobile Logo -->
-      <div class="lg:hidden flex items-center gap-2 mb-6 mt-4">
-        <div class="w-8 h-8 rounded-lg bg-[var(--color-primary)] flex items-center justify-center text-white shadow-sm">
-          <UIcon name="i-lucide-sparkles" class="w-5 h-5" />
+  <AuthPageShell
+    mode="signup"
+    title="Create your account"
+    subtitle="Start your journey to smarter studying."
+    align="start"
+  >
+    <form @submit.prevent="onSubmit" class="space-y-4">
+      <label class="block space-y-2.5">
+        <span class="text-[13px] font-semibold text-[var(--color-text)]">Full name</span>
+        <div class="flex h-12 items-center gap-3 rounded-[1rem] border border-[var(--color-border)] bg-[var(--color-input-bg)] px-4">
+          <UIcon name="i-lucide-user" class="h-5 w-5 text-[var(--color-text-muted)]" />
+          <input
+            v-model="form.fullName"
+            type="text"
+            required
+            placeholder="Enter your full name"
+            class="h-full w-full border-0 bg-transparent text-[15px] text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)]"
+          >
         </div>
-        <span class="text-xl font-bold tracking-tight text-[var(--color-text)]">Planify AI</span>
+      </label>
+
+      <label class="block space-y-2.5">
+        <span class="text-[13px] font-semibold text-[var(--color-text)]">Email address</span>
+        <div class="flex h-12 items-center gap-3 rounded-[1rem] border border-[var(--color-border)] bg-[var(--color-input-bg)] px-4">
+          <UIcon name="i-lucide-mail" class="h-5 w-5 text-[var(--color-text-muted)]" />
+          <input
+            v-model="form.email"
+            type="email"
+            required
+            placeholder="Enter your email"
+            class="h-full w-full border-0 bg-transparent text-[15px] text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)]"
+          >
+        </div>
+      </label>
+
+      <label class="block space-y-2.5">
+        <span class="text-[13px] font-semibold text-[var(--color-text)]">Password</span>
+        <div class="flex h-12 items-center gap-3 rounded-[1rem] border border-[var(--color-border)] bg-[var(--color-input-bg)] px-4">
+          <UIcon name="i-lucide-lock" class="h-5 w-5 text-[var(--color-text-muted)]" />
+          <input
+            v-model="form.password"
+            :type="showPassword ? 'text' : 'password'"
+            required
+            placeholder="Create a password"
+            class="h-full w-full border-0 bg-transparent text-[15px] text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)]"
+          >
+          <button
+            type="button"
+            class="text-[var(--color-text-muted)] transition-colors hover:text-[var(--color-text)]"
+            @click="showPassword = !showPassword"
+          >
+            <UIcon :name="showPassword ? 'i-lucide-eye-off' : 'i-lucide-eye'" class="h-5 w-5" />
+          </button>
+        </div>
+        <p class="text-[12px] leading-[1.45] text-[var(--color-text-muted)]">Use at least 8 characters with a mix of letters, numbers &amp; symbols.</p>
+      </label>
+
+      <label class="block space-y-2.5">
+        <span class="text-[13px] font-semibold text-[var(--color-text)]">Confirm password</span>
+        <div class="flex h-12 items-center gap-3 rounded-[1rem] border border-[var(--color-border)] bg-[var(--color-input-bg)] px-4">
+          <UIcon name="i-lucide-lock" class="h-5 w-5 text-[var(--color-text-muted)]" />
+          <input
+            v-model="form.confirmPassword"
+            :type="showConfirmPassword ? 'text' : 'password'"
+            required
+            placeholder="Confirm your password"
+            class="h-full w-full border-0 bg-transparent text-[15px] text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)]"
+          >
+          <button
+            type="button"
+            class="text-[var(--color-text-muted)] transition-colors hover:text-[var(--color-text)]"
+            @click="showConfirmPassword = !showConfirmPassword"
+          >
+            <UIcon :name="showConfirmPassword ? 'i-lucide-eye-off' : 'i-lucide-eye'" class="h-5 w-5" />
+          </button>
+        </div>
+      </label>
+
+      <label class="block space-y-2.5">
+        <span class="text-[13px] font-semibold text-[var(--color-text)]">I'm a...</span>
+        <div class="flex h-12 items-center gap-3 rounded-[1rem] border border-[var(--color-border)] bg-[var(--color-input-bg)] px-4">
+          <UIcon name="i-lucide-graduation-cap" class="h-5 w-5 text-[var(--color-text-muted)]" />
+          <select
+            v-model="form.role"
+            class="h-full w-full appearance-none border-0 bg-transparent text-[15px] text-[var(--color-text)] outline-none"
+          >
+            <option v-for="option in roleOptions" :key="option" :value="option">{{ option }}</option>
+          </select>
+          <UIcon name="i-lucide-chevron-down" class="h-5 w-5 text-[var(--color-text-muted)]" />
+        </div>
+      </label>
+
+      <label class="flex items-start gap-3 pt-1 text-[14px] leading-6 text-[var(--color-text)]">
+        <input
+          v-model="form.terms"
+          type="checkbox"
+          required
+          class="mt-1 h-5 w-5 rounded-[6px] border border-[var(--color-border-strong)] accent-[var(--color-primary)]"
+        >
+        <span>
+          I agree to the
+          <a href="#" class="text-[var(--color-primary)] hover:underline">Terms of Service</a>
+          and
+          <a href="#" class="text-[var(--color-primary)] hover:underline">Privacy Policy</a>
+        </span>
+      </label>
+
+      <button
+        type="submit"
+        class="flex h-12 w-full items-center justify-center gap-3 rounded-[1rem] bg-[linear-gradient(90deg,#5c61f4_0%,#6b4df6_100%)] px-6 text-[0.96rem] font-semibold text-white shadow-[0_18px_40px_rgba(92,97,244,0.25)] transition-transform duration-200 hover:-translate-y-0.5 disabled:opacity-70"
+        :disabled="isLoading"
+      >
+        <UIcon name="i-lucide-sparkles" class="h-5 w-5" />
+        <span>{{ isLoading ? 'Creating account...' : 'Create account' }}</span>
+      </button>
+
+      <div class="relative my-0.5 flex items-center">
+        <div class="flex-grow border-t border-[var(--color-border)]" />
+        <span class="mx-5 flex-shrink-0 text-sm text-[var(--color-text-muted)]">or</span>
+        <div class="flex-grow border-t border-[var(--color-border)]" />
       </div>
 
-      <div class="w-full max-w-[440px] animate-slide-up mt-4 mb-8 lg:my-8">
-        
-        <!-- Registration Form Card -->
-        <div class="soft-card p-8 sm:p-10 mb-6">
-          <div class="mb-8 text-center">
-            <h2 class="text-2xl font-bold text-[var(--color-text)] mb-2">Create your account</h2>
-            <p class="text-sm text-[var(--color-text-muted)]">Start your journey to smarter studying.</p>
+      <button
+        type="button"
+        class="flex h-12 w-full items-center justify-center gap-3 rounded-[1rem] border border-[var(--color-border)] bg-[var(--color-input-bg)] px-6 text-[14px] font-semibold text-[var(--color-text)] transition-colors hover:bg-[var(--color-bg-soft)]"
+      >
+        <UIcon name="i-simple-icons-google" class="h-5 w-5" />
+        <span>Continue with Google</span>
+      </button>
+
+      <p class="pt-0.5 text-center text-[14px] text-[var(--color-text-muted)]">
+        Already have an account?
+        <NuxtLink to="/auth/signin" class="font-medium text-[var(--color-primary)] hover:text-[var(--color-primary-hover)]">
+          Sign in
+        </NuxtLink>
+      </p>
+    </form>
+
+    <template #after-card>
+      <div class="mt-4 rounded-[1.65rem] border border-[color-mix(in_srgb,var(--color-ai)_18%,transparent)] bg-[color-mix(in_srgb,var(--color-card-bg)_80%,transparent)] px-5 py-4 shadow-[0_16px_50px_rgba(120,92,255,0.08)] backdrop-blur-sm">
+        <div class="relative flex items-center gap-4">
+          <div class="flex h-12 w-12 items-center justify-center rounded-full border border-[rgba(120,92,255,0.18)] bg-[rgba(120,92,255,0.08)] text-[var(--color-ai)]">
+            <UIcon name="i-lucide-gift" class="h-6 w-6" />
           </div>
-
-          <form @submit.prevent="onSubmit" class="space-y-4">
-            <!-- Full Name -->
-            <UFormGroup label="Full name" name="fullName">
-              <UInput 
-                v-model="form.fullName" 
-                icon="i-lucide-user" 
-                placeholder="Enter your full name" 
-                required 
-                size="md"
-              />
-            </UFormGroup>
-
-            <!-- Email -->
-            <UFormGroup label="Email address" name="email">
-              <UInput 
-                v-model="form.email" 
-                type="email" 
-                icon="i-lucide-mail" 
-                placeholder="Enter your email" 
-                required 
-                size="md"
-              />
-            </UFormGroup>
-
-            <!-- Password -->
-            <UFormGroup 
-              label="Password" 
-              name="password"
-              hint="Use at least 8 characters with a mix of letters, numbers & symbols."
-              :ui="{ hint: 'text-[11px] text-[var(--color-text-muted)] mt-1 block w-full leading-tight' }"
-            >
-              <UInput 
-                v-model="form.password" 
-                :type="showPassword ? 'text' : 'password'" 
-                icon="i-lucide-lock" 
-                placeholder="Create a password" 
-                required
-                size="md"
-                :ui="{ icon: { trailing: { pointer: '' } } }"
-              >
-                <template #trailing>
-                  <UButton
-                    color="gray"
-                    variant="link"
-                    :icon="showPassword ? 'i-lucide-eye-off' : 'i-lucide-eye'"
-                    :padded="false"
-                    @click="showPassword = !showPassword"
-                    class="text-[var(--color-text-muted)] hover:text-[var(--color-text)]"
-                  />
-                </template>
-              </UInput>
-            </UFormGroup>
-
-            <!-- Confirm Password -->
-            <UFormGroup label="Confirm password" name="confirmPassword">
-              <UInput 
-                v-model="form.confirmPassword" 
-                :type="showConfirmPassword ? 'text' : 'password'" 
-                icon="i-lucide-lock" 
-                placeholder="Confirm your password" 
-                required
-                size="md"
-                :ui="{ icon: { trailing: { pointer: '' } } }"
-              >
-                <template #trailing>
-                  <UButton
-                    color="gray"
-                    variant="link"
-                    :icon="showConfirmPassword ? 'i-lucide-eye-off' : 'i-lucide-eye'"
-                    :padded="false"
-                    @click="showConfirmPassword = !showConfirmPassword"
-                    class="text-[var(--color-text-muted)] hover:text-[var(--color-text)]"
-                  />
-                </template>
-              </UInput>
-            </UFormGroup>
-
-            <!-- Role Select -->
-            <UFormGroup label="I'm a..." name="role">
-              <USelect 
-                v-model="form.role" 
-                :options="roleOptions"
-                size="md"
-                icon="i-lucide-briefcase"
-              />
-            </UFormGroup>
-
-            <!-- Terms -->
-            <div class="pt-2">
-              <UCheckbox v-model="form.terms" name="terms" required>
-                <template #label>
-                  <span class="text-sm text-[var(--color-text)]">
-                    I agree to the <a href="#" class="text-[var(--color-primary)] hover:underline">Terms of Service</a> and <a href="#" class="text-[var(--color-primary)] hover:underline">Privacy Policy</a>
-                  </span>
-                </template>
-              </UCheckbox>
-            </div>
-
-            <!-- Submit -->
-            <UButton 
-              type="submit" 
-              color="primary" 
-              block 
-              size="lg" 
-              class="mt-6 font-semibold"
-              :loading="isLoading"
-              icon="i-lucide-sparkles"
-            >
-              Create account
-            </UButton>
-
-            <!-- Divider -->
-            <div class="relative my-5 flex items-center">
-              <div class="flex-grow border-t border-[var(--color-border)]"></div>
-              <span class="flex-shrink-0 mx-4 text-xs text-[var(--color-text-muted)] uppercase tracking-wider">or</span>
-              <div class="flex-grow border-t border-[var(--color-border)]"></div>
-            </div>
-
-            <!-- Google Sign Up -->
-            <UButton 
-              color="white" 
-              variant="outline" 
-              block 
-              size="lg" 
-              icon="i-simple-icons-google"
-              class="font-medium text-[var(--color-text)] bg-white dark:bg-[var(--color-surface)] border-[var(--color-border)] hover:bg-[var(--color-bg-soft)] dark:hover:bg-[var(--color-surface-soft)]"
-            >
-              Continue with Google
-            </UButton>
-
-          </form>
-
-          <!-- Footer link -->
-          <p class="text-center mt-6 text-sm text-[var(--color-text-muted)]">
-            Already have an account? 
-            <NuxtLink to="/auth/signin" class="font-medium text-[var(--color-primary)] hover:text-[var(--color-primary-hover)] transition-colors">
-              Sign in
-            </NuxtLink>
-          </p>
+          <div class="min-w-0 flex-1">
+            <h4 class="text-[0.97rem] font-bold text-[var(--color-text)]">Start free for 1 month</h4>
+            <p class="mt-1 text-[0.86rem] leading-[1.45] text-[var(--color-text-soft)]">Get full access to all AI features and 10,000 starter tokens.</p>
+          </div>
+          <UIcon name="i-lucide-sparkles" class="absolute right-1 top-1 h-5 w-5 text-[var(--color-ai)]/30" />
+          <UIcon name="i-lucide-sparkles" class="absolute bottom-0 right-10 h-4 w-4 text-[var(--color-ai)]/20" />
         </div>
-
-        <!-- Free Trial Banner -->
-        <div class="ai-card p-5 bg-[var(--color-surface)] flex items-center gap-4">
-          <div class="w-10 h-10 rounded-full bg-[var(--color-ai)]/10 flex items-center justify-center flex-shrink-0 text-[var(--color-ai)]">
-            <UIcon name="i-lucide-gift" class="w-5 h-5" />
-          </div>
-          <div class="flex-1">
-            <h4 class="text-sm font-bold text-[var(--color-text)] mb-0.5">Start free for 1 month</h4>
-            <p class="text-xs text-[var(--color-text-muted)]">Get full access to all AI features and 10,000 starter tokens.</p>
-          </div>
-          <UIcon name="i-lucide-sparkles" class="w-4 h-4 text-[var(--color-ai)]/40 absolute bottom-3 right-3" />
-          <UIcon name="i-lucide-sparkles" class="w-6 h-6 text-[var(--color-ai)]/20 absolute top-2 right-6" />
-        </div>
-
       </div>
-    </div>
-  </div>
+    </template>
+  </AuthPageShell>
 </template>
-
-<style scoped>
-/* Scoped styles */
-</style>

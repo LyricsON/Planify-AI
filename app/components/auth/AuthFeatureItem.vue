@@ -20,10 +20,10 @@ const iconBoxClass = computed(() => {
       <UIcon :name="icon" class="w-5 h-5" />
     </div>
     <div>
-      <h3 class="text-base font-semibold text-[var(--color-text)] mb-1">
+      <h3 class="mb-1 text-[0.98rem] font-semibold text-[var(--color-text)]">
         {{ title }}
       </h3>
-      <p class="text-sm text-[var(--color-text-muted)] leading-relaxed">
+      <p class="max-w-[23rem] text-[0.88rem] leading-[1.65] text-[var(--color-text-muted)]">
         {{ description }}
       </p>
     </div>

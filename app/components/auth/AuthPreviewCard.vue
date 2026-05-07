@@ -3,23 +3,19 @@
 </script>
 
 <template>
-  <div class="animate-fade-in w-full max-w-[450px] mx-auto relative group">
+  <div class="group relative mx-0 w-full max-w-[540px] animate-fade-in">
     <!-- Light Mode Image -->
     <img 
       src="/images/signLight.png" 
       alt="Planify AI Dashboard Preview Light" 
-      class="w-full h-auto rounded-xl shadow-[var(--shadow-floating)] border border-[var(--color-border)] transition-transform duration-500 group-hover:-translate-y-2 dark:hidden object-cover" 
+      class="h-auto w-full rounded-[1.5rem] border border-[var(--color-border)] object-cover shadow-[var(--shadow-floating)] transition-transform duration-500 group-hover:-translate-y-2 dark:hidden" 
     />
     
     <!-- Dark Mode Image -->
     <img 
       src="/images/signDark.png" 
       alt="Planify AI Dashboard Preview Dark" 
-      class="w-full h-auto rounded-xl shadow-[var(--shadow-floating)] border border-[var(--color-border)] transition-transform duration-500 group-hover:-translate-y-2 hidden dark:block object-cover" 
+      class="hidden h-auto w-full rounded-[1.5rem] border border-[var(--color-border)] object-cover shadow-[var(--shadow-floating)] transition-transform duration-500 group-hover:-translate-y-2 dark:block" 
     />
   </div>
 </template>
-
-<style scoped>
-/* Any additional specific overrides */
-</style>

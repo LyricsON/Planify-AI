@@ -61,9 +61,9 @@ const content = computed(() => {
 </script>
 
 <template>
-  <div class="h-full flex flex-col justify-center max-w-xl mx-auto py-12 px-6 lg:px-12 w-full">
+  <div class="flex h-full w-full max-w-[590px] flex-col justify-center px-7 py-7 lg:px-10 xl:px-12">
     <!-- Brand -->
-    <div class="flex items-center gap-2 mb-10">
+    <div class="mb-7 flex items-center gap-3">
       <div class="w-8 h-8 rounded-lg bg-[var(--color-primary)] flex items-center justify-center text-white shadow-sm">
         <UIcon name="i-lucide-sparkles" class="w-5 h-5" />
       </div>
@@ -71,18 +71,18 @@ const content = computed(() => {
     </div>
 
     <!-- Hero Text -->
-    <div class="mb-10 animate-slide-up" style="animation-delay: 100ms">
-      <h1 class="text-4xl lg:text-5xl font-extrabold tracking-tight text-[var(--color-text)] leading-tight mb-4">
+    <div class="mb-7 animate-slide-up" style="animation-delay: 100ms">
+      <h1 class="mb-4 text-[2.5rem] font-extrabold leading-[1.08] tracking-tight text-[var(--color-text)] xl:text-[3.25rem]">
         {{ content.headlineParts[0] }}<br />
         <span class="text-[var(--color-primary)]">{{ content.headlineParts[1] }}</span>
       </h1>
-      <p class="text-lg text-[var(--color-text-muted)] max-w-md leading-relaxed">
+      <p class="max-w-[25rem] text-[0.92rem] leading-[1.75] text-[var(--color-text-muted)]">
         {{ content.description }}
       </p>
     </div>
 
     <!-- Preview Card -->
-    <div class="mb-12 animate-slide-up" style="animation-delay: 200ms">
+    <div class="mb-8 animate-slide-up" style="animation-delay: 200ms">
       <AuthPreviewCard />
     </div>
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
+import { reactive, ref } from 'vue'
 
 definePageMeta({
   layout: 'auth'
@@ -16,9 +16,8 @@ const isLoading = ref(false)
 
 const onSubmit = async () => {
   if (!form.email || !form.password) return
-  
+
   isLoading.value = true
-  // Mock API call
   await new Promise(resolve => setTimeout(resolve, 500))
   console.log('Sign in payload:', form)
   isLoading.value = false
@@ -26,128 +25,95 @@ const onSubmit = async () => {
 </script>
 
 <template>
-  <div class="flex min-h-screen">
-    <!-- Left Panel (Brand & Info) -->
-    <div class="hidden lg:flex w-[48%] relative">
-      <!-- Background pattern/gradient -->
-      <div class="absolute inset-0 bg-gradient-to-br from-[var(--color-primary-soft)] to-[var(--color-bg)] opacity-50 z-0"></div>
-      
-      <!-- Content -->
-      <div class="relative z-10 w-full">
-        <AuthBrandPanel mode="signin" />
-      </div>
-    </div>
-
-    <!-- Right Panel (Form) -->
-    <div class="flex-1 flex flex-col justify-center items-center p-6 sm:p-12 w-full lg:w-[52%]">
-      
-      <!-- Mobile Logo -->
-      <div class="lg:hidden flex items-center gap-2 mb-8">
-        <div class="w-8 h-8 rounded-lg bg-[var(--color-primary)] flex items-center justify-center text-white shadow-sm">
-          <UIcon name="i-lucide-sparkles" class="w-5 h-5" />
+  <AuthPageShell
+    mode="signin"
+    title="Welcome back"
+    subtitle="Sign in to continue to Planify AI"
+    align="center"
+  >
+    <form @submit.prevent="onSubmit" class="space-y-6">
+      <label class="block space-y-3">
+        <span class="text-[14px] font-semibold text-[var(--color-text)]">Email address</span>
+        <div class="flex h-14 items-center gap-3 rounded-[1.05rem] border border-[var(--color-border)] bg-[var(--color-input-bg)] px-4">
+          <UIcon name="i-lucide-mail" class="h-5 w-5 text-[var(--color-text-muted)]" />
+          <input
+            v-model="form.email"
+            type="email"
+            required
+            placeholder="you@example.com"
+            class="h-full w-full border-0 bg-transparent text-[15px] text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)]"
+          >
         </div>
-        <span class="text-xl font-bold tracking-tight text-[var(--color-text)]">Planify AI</span>
-      </div>
+      </label>
 
-      <div class="w-full max-w-[440px] animate-slide-up">
-        <div class="soft-card p-8 sm:p-10">
-          
-          <div class="mb-8 text-center">
-            <h2 class="text-2xl font-bold text-[var(--color-text)] mb-2">Welcome back</h2>
-            <p class="text-sm text-[var(--color-text-muted)]">Sign in to continue to Planify AI</p>
-          </div>
-
-          <form @submit.prevent="onSubmit" class="space-y-5">
-            <!-- Email -->
-            <UFormGroup label="Email address" name="email">
-              <UInput 
-                v-model="form.email" 
-                type="email" 
-                icon="i-lucide-mail" 
-                placeholder="you@example.com" 
-                required 
-                size="md"
-                class="w-full"
-              />
-            </UFormGroup>
-
-            <!-- Password -->
-            <UFormGroup label="Password" name="password">
-              <UInput 
-                v-model="form.password" 
-                :type="showPassword ? 'text' : 'password'" 
-                icon="i-lucide-lock" 
-                placeholder="••••••••" 
-                required
-                size="md"
-                class="w-full"
-                :ui="{ icon: { trailing: { pointer: '' } } }"
-              >
-                <template #trailing>
-                  <UButton
-                    color="gray"
-                    variant="link"
-                    :icon="showPassword ? 'i-lucide-eye-off' : 'i-lucide-eye'"
-                    :padded="false"
-                    @click="showPassword = !showPassword"
-                    class="text-[var(--color-text-muted)] hover:text-[var(--color-text)]"
-                  />
-                </template>
-              </UInput>
-            </UFormGroup>
-
-            <!-- Options -->
-            <div class="flex items-center justify-between mt-2">
-              <UCheckbox v-model="form.remember" label="Remember me" name="remember" />
-              <NuxtLink to="/auth/forgot-password" class="text-sm font-medium text-[var(--color-primary)] hover:text-[var(--color-primary-hover)] transition-colors">
-                Forgot password?
-              </NuxtLink>
-            </div>
-
-            <!-- Submit -->
-            <UButton 
-              type="submit" 
-              color="primary" 
-              block 
-              size="lg" 
-              class="mt-6 font-semibold"
-              :loading="isLoading"
-              trailing-icon="i-lucide-arrow-right"
-            >
-              Sign in
-            </UButton>
-
-            <!-- Divider -->
-            <div class="relative my-6 flex items-center">
-              <div class="flex-grow border-t border-[var(--color-border)]"></div>
-              <span class="flex-shrink-0 mx-4 text-xs text-[var(--color-text-muted)] uppercase tracking-wider">or</span>
-              <div class="flex-grow border-t border-[var(--color-border)]"></div>
-            </div>
-
-            <!-- Google Sign In -->
-            <UButton 
-              color="white" 
-              variant="outline" 
-              block 
-              size="lg" 
-              icon="i-simple-icons-google"
-              class="font-medium text-[var(--color-text)] bg-white dark:bg-[var(--color-surface)] border-[var(--color-border)] hover:bg-[var(--color-bg-soft)] dark:hover:bg-[var(--color-surface-soft)]"
-            >
-              Continue with Google
-            </UButton>
-
-          </form>
-
+      <label class="block space-y-3">
+        <span class="text-[14px] font-semibold text-[var(--color-text)]">Password</span>
+        <div class="flex h-14 items-center gap-3 rounded-[1.05rem] border border-[var(--color-border)] bg-[var(--color-input-bg)] px-4">
+          <UIcon name="i-lucide-lock" class="h-5 w-5 text-[var(--color-text-muted)]" />
+          <input
+            v-model="form.password"
+            :type="showPassword ? 'text' : 'password'"
+            required
+            placeholder=".............."
+            class="h-full w-full border-0 bg-transparent text-[15px] text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)]"
+          >
+          <button
+            type="button"
+            class="text-[var(--color-text-muted)] transition-colors hover:text-[var(--color-text)]"
+            @click="showPassword = !showPassword"
+          >
+            <UIcon :name="showPassword ? 'i-lucide-eye-off' : 'i-lucide-eye'" class="h-5 w-5" />
+          </button>
         </div>
+      </label>
 
-        <!-- Footer link -->
-        <p class="text-center mt-6 text-sm text-[var(--color-text-muted)]">
-          Don't have an account? 
-          <NuxtLink to="/auth/signup" class="font-medium text-[var(--color-primary)] hover:text-[var(--color-primary-hover)] transition-colors">
-            Sign up
-          </NuxtLink>
-        </p>
+      <div class="flex items-center justify-between gap-4">
+        <label class="flex items-center gap-3 text-[14px] text-[var(--color-text)]">
+          <input
+            v-model="form.remember"
+            type="checkbox"
+            class="h-5 w-5 rounded-[6px] border border-[var(--color-border-strong)] accent-[var(--color-primary)]"
+          >
+          <span>Remember me</span>
+        </label>
+
+        <NuxtLink
+          to="/auth/forgot-password"
+          class="text-[14px] font-medium text-[var(--color-primary)] transition-colors hover:text-[var(--color-primary-hover)]"
+        >
+          Forgot password?
+        </NuxtLink>
       </div>
-    </div>
-  </div>
+
+      <button
+        type="submit"
+        class="flex h-14 w-full items-center justify-center gap-3 rounded-[1.05rem] bg-[linear-gradient(90deg,#5c61f4_0%,#6b4df6_100%)] px-6 text-[0.98rem] font-semibold text-white shadow-[0_18px_40px_rgba(92,97,244,0.25)] transition-transform duration-200 hover:-translate-y-0.5 disabled:opacity-70"
+        :disabled="isLoading"
+      >
+        <span>{{ isLoading ? 'Signing in...' : 'Sign in' }}</span>
+        <UIcon name="i-lucide-arrow-right" class="h-5 w-5" />
+      </button>
+
+      <div class="relative flex items-center">
+        <div class="flex-grow border-t border-[var(--color-border)]" />
+        <span class="mx-5 flex-shrink-0 text-sm text-[var(--color-text-muted)]">or</span>
+        <div class="flex-grow border-t border-[var(--color-border)]" />
+      </div>
+
+      <button
+        type="button"
+        class="flex h-12 w-full items-center justify-center gap-3 rounded-[1.05rem] border border-[var(--color-border)] bg-[var(--color-input-bg)] px-6 text-[14px] font-semibold text-[var(--color-text)] transition-colors hover:bg-[var(--color-bg-soft)]"
+      >
+        <UIcon name="i-simple-icons-google" class="h-5 w-5" />
+        <span>Continue with Google</span>
+      </button>
+
+      <p class="pt-0.5 text-center text-[14px] text-[var(--color-text-muted)]">
+        Don't have an account?
+        <NuxtLink to="/auth/signup" class="font-medium text-[var(--color-primary)] hover:text-[var(--color-primary-hover)]">
+          Sign up
+        </NuxtLink>
+      </p>
+    </form>
+  </AuthPageShell>
 </template>
