@@ -62,10 +62,10 @@ onMounted(async () => {
           :key="item.to"
           :to="item.to"
           class="relative flex items-center gap-3.5 rounded-[12px] px-4 py-3 text-[14px] font-semibold transition"
-          :class="isRouteActive(item.to) ? 'bg-[#f5f4fd] text-[#534bfa] dark:bg-indigo-900/40 dark:text-indigo-400' : 'text-slate-800 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-[#534bfa] dark:hover:text-slate-200'"
+          :class="isRouteActive(item.to) ? 'bg-[#f5f4fd] text-[#534bfa] dark:bg-indigo-900/40 dark:text-indigo-400' : 'text-[#3a365c] dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-[#534bfa] dark:hover:text-slate-200'"
         >
           <div v-if="isRouteActive(item.to)" class="absolute -left-6 top-1.5 bottom-1.5 w-[5px] rounded-r-[6px] bg-[#534bfa] dark:bg-indigo-400"></div>
-          <UIcon :name="item.icon" class="size-[20px]" :class="isRouteActive(item.to) ? 'text-[#534bfa] dark:text-indigo-400' : 'text-slate-800 dark:text-slate-400'" />
+          <UIcon :name="item.icon" class="size-[20px]" :class="isRouteActive(item.to) ? 'text-[#534bfa] dark:text-indigo-400' : 'text-[#3a365c] dark:text-slate-400'" />
           <span>{{ item.label }}</span>
         </NuxtLink>
       </nav>
