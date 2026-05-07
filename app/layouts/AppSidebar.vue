@@ -61,34 +61,55 @@ onMounted(async () => {
           v-for="item in navItems"
           :key="item.to"
           :to="item.to"
-          class="relative flex items-center gap-3.5 rounded-[12px] px-4 py-3 text-[14px] font-bold transition"
-          :class="isRouteActive(item.to) ? 'bg-[#f5f4fd] text-[#534bfa] dark:bg-indigo-900/40 dark:text-indigo-400' : 'text-[#3a365c] dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-[#534bfa] dark:hover:text-slate-200'"
+          class="relative flex items-center gap-3.5 rounded-[12px] px-4 py-3 text-[14px] font-semibold transition"
+          :class="isRouteActive(item.to) ? 'bg-[#f5f4fd] text-[#534bfa] dark:bg-indigo-900/40 dark:text-indigo-400' : 'text-slate-800 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-[#534bfa] dark:hover:text-slate-200'"
         >
           <div v-if="isRouteActive(item.to)" class="absolute -left-6 top-1.5 bottom-1.5 w-[5px] rounded-r-[6px] bg-[#534bfa] dark:bg-indigo-400"></div>
-          <UIcon :name="item.icon" class="size-[20px]" :class="isRouteActive(item.to) ? 'text-[#534bfa] dark:text-indigo-400' : 'text-[#3a365c] dark:text-slate-400'" />
+          <UIcon :name="item.icon" class="size-[20px]" :class="isRouteActive(item.to) ? 'text-[#534bfa] dark:text-indigo-400' : 'text-slate-800 dark:text-slate-400'" />
           <span>{{ item.label }}</span>
         </NuxtLink>
       </nav>
 
       <div class="mt-8 flex-shrink-0 space-y-6">
         <!-- Upgrade Plan Card -->
-        <div class="rounded-[20px] bg-gradient-to-br from-[#3730a3] to-[#4c1d95] p-5 text-white shadow-lg shadow-indigo-200/50 dark:shadow-none relative overflow-hidden">
-          <div class="absolute -right-6 top-0 size-24 bg-gradient-to-tr from-amber-400/40 to-pink-500/40 rounded-full blur-[24px]"></div>
+        <div class="rounded-[14px] bg-gradient-to-br from-[#4f46e5] via-[#6366f1] to-[#7c3aed] p-5 text-white relative overflow-hidden flex flex-col items-start shadow-sm">
+          <!-- Decorative Stars -->
+          <div class="absolute right-3 top-1/2 -translate-y-1/2 flex items-center justify-center opacity-90 pointer-events-none">
+            <!-- Small Blue Star -->
+            <svg class="absolute -left-3 top-5 w-[16px] h-[16px]" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <linearGradient id="grad-blue" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#818cf8" />
+                  <stop offset="100%" stop-color="#38bdf8" />
+                </linearGradient>
+              </defs>
+              <path d="M12 0C12 8 20 12 24 12C20 12 12 16 12 24C12 16 4 12 0 12C4 12 12 8 12 0Z" fill="url(#grad-blue)" />
+            </svg>
+            <!-- Large Orange/Pink Star -->
+            <svg class="w-[36px] h-[36px]" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <linearGradient id="grad-orange" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#fba861" />
+                  <stop offset="100%" stop-color="#eb568e" />
+                </linearGradient>
+              </defs>
+              <path d="M12 0C12 8 20 12 24 12C20 12 12 16 12 24C12 16 4 12 0 12C4 12 12 8 12 0Z" fill="url(#grad-orange)" />
+            </svg>
+          </div>
           
-          <p class="text-[13px] font-bold relative z-10 text-white">
+          <p class="text-[13px] font-semibold relative z-10 text-white tracking-wide">
             Upgrade your plan
           </p>
-          <p class="mt-2 text-[11px] leading-relaxed text-indigo-100 pr-4 relative z-10 font-medium">
-            Unlock unlimited AI features and more productivity.
+          <p class="mt-2 text-[11px] leading-[1.6] text-white/80 pr-12 relative z-10 font-medium">
+            Unlock unlimited AI<br>
+            features and more<br>
+            productivity.
           </p>
-          <UButton
-            size="sm"
-            color="white"
-            variant="solid"
-            class="mt-4 text-[12px] text-[#4338ca] font-bold bg-white hover:bg-slate-50 rounded-[10px] px-4 h-[32px] relative z-10"
+          <button
+            class="mt-4 text-[12px] text-[#534bfa] font-bold bg-white hover:bg-slate-50 rounded-[8px] px-4 py-1.5 relative z-10 transition-colors"
           >
             Upgrade Now
-          </UButton>
+          </button>
         </div>
 
         <!-- Tokens Card -->

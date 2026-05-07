@@ -352,7 +352,7 @@ onMounted(() => {
               <p class="text-sm text-slate-500">No suggestions available.</p>
             </div>
 
-            <UButton block color="violet" variant="soft" class="mt-5 font-bold text-[12px] h-10 rounded-[10px] bg-violet-50 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 hover:bg-violet-100 transition" icon="i-lucide-refresh-cw" :loading="isGeneratingPlan" @click="generatePlan">
+            <UButton block color="primary" variant="soft" class="mt-5 font-bold text-[12px] h-10 rounded-[10px] bg-violet-50 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 hover:bg-violet-100 transition" icon="i-lucide-refresh-cw" :loading="isGeneratingPlan" @click="generatePlan">
               Generate new plan
             </UButton>
           </div>
