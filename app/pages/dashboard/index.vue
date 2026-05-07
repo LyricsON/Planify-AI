@@ -177,6 +177,21 @@ function getDaysUntil(dateStr: string | Date) {
   return `In ${diffDays} days`
 }
 
+function getDaysUntilClass(dateStr: string | Date) {
+  const diffTime = new Date(dateStr).getTime() - new Date().getTime()
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+  if (diffDays <= 1) return 'bg-red-50 text-red-500'
+  if (diffDays <= 3) return 'bg-amber-50 text-amber-500'
+  return 'bg-emerald-50 text-emerald-600'
+}
+
+const greeting = computed(() => {
+  const hour = new Date().getHours()
+  if (hour < 12) return 'Good morning'
+  if (hour < 18) return 'Good afternoon'
+  return 'Good evening'
+})
+
 onMounted(() => {
   fetchData().then(() => generatePlan())
 })
@@ -189,7 +204,7 @@ onMounted(() => {
   <section v-else class="max-w-[1400px] mx-auto pb-10">
     <div class="mb-6">
       <h1 class="text-[26px] font-bold text-slate-900 dark:text-white">
-        Good morning, {{ userName }}! 👋
+        {{ greeting }}, {{ userName }}! 👋
       </h1>
       <p class="mt-1 text-[15px] text-slate-500 dark:text-slate-400">
         Let's make today productive and focused.
@@ -512,7 +527,7 @@ onMounted(() => {
                     <p class="text-[13px] font-bold text-slate-900 dark:text-white truncate">{{ item.title }}</p>
                     <p class="text-[11px] font-medium text-slate-500 mt-1">{{ formatDateShort(item.date) }} • {{ formatTime(item.date.toISOString()) || '10:00 AM' }}</p>
                  </div>
-                 <span class="text-[10px] px-2.5 py-1 rounded-md font-bold whitespace-nowrap tracking-wide uppercase" :class="item.title.includes('Exam') ? 'bg-red-50 text-red-500' : (item.title.includes('Homework') ? 'bg-amber-50 text-amber-500' : 'bg-emerald-50 text-emerald-500')">
+                 <span class="text-[10px] px-2.5 py-1 rounded-md font-bold whitespace-nowrap tracking-wide uppercase" :class="getDaysUntilClass(item.date)">
                     {{ getDaysUntil(item.date) }}
                  </span>
               </div>

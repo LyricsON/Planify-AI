@@ -45,8 +45,8 @@ onMounted(async () => {
 </script>
 
 <template>
-  <aside class="fixed left-0 top-0 z-40 h-screen w-[260px] border-r border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-700">
-    <div class="px-6 py-8 flex flex-col min-h-full">
+  <aside class="fixed left-0 top-0 z-40 h-screen w-[280px] border-r border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-700">
+    <div class="px-4 py-8 flex flex-col min-h-full">
       <NuxtLink to="/dashboard" class="mb-10 flex flex-shrink-0 items-center gap-3">
         <div class="flex size-[38px] items-center justify-center rounded-[12px] bg-[#4338ca] text-white shadow-sm shadow-indigo-200 dark:shadow-none">
           <UIcon name="i-lucide-box" class="size-5 fill-white/20" />
@@ -61,12 +61,12 @@ onMounted(async () => {
           v-for="item in navItems"
           :key="item.to"
           :to="item.to"
-          class="relative flex items-center gap-3.5 rounded-[12px] px-4 py-3 text-[14px] font-semibold transition"
-          :class="isRouteActive(item.to) ? 'bg-[#f5f4fd] text-[#534bfa] dark:bg-indigo-900/40 dark:text-indigo-400' : 'text-[#3a365c] dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-[#534bfa] dark:hover:text-slate-200'"
+          class="relative flex items-center gap-2 rounded-[12px] px-2 py-3 text-[14px] font-semibold transition text-slate-800"
+          :class="isRouteActive(item.to) ? 'bg-[#f5f4fd] text-[#534bfa] dark:bg-indigo-900/40 dark:text-indigo-400' : 'text-slate-800 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-[#534bfa] dark:hover:text-slate-200'"
         >
           <div v-if="isRouteActive(item.to)" class="absolute -left-6 top-1.5 bottom-1.5 w-[5px] rounded-r-[6px] bg-[#534bfa] dark:bg-indigo-400"></div>
-          <UIcon :name="item.icon" class="size-[20px]" :class="isRouteActive(item.to) ? 'text-[#534bfa] dark:text-indigo-400' : 'text-[#3a365c] dark:text-slate-400'" />
-          <span>{{ item.label }}</span>
+          <UIcon :name="item.icon" class="size-[20px]" :class="isRouteActive(item.to) ? 'text-[#534bfa] dark:text-indigo-400' : 'text-slate-800 dark:text-slate-400'" />
+          <span :class="isRouteActive(item.to) ? 'text-[#534bfa] dark:text-indigo-400' : 'text-slate-800 dark:text-slate-400'">{{ item.label }}</span>
         </NuxtLink>
       </nav>
 

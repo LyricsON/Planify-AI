@@ -4,17 +4,15 @@ import AppTopbar from './AppTopbar.vue'
 </script>
 
 <template>
-  <div class="min-h-screen bg-slate-50 dark:bg-slate-900">
-    <div class="flex">
-      <AppSidebar />
+  <div class="h-screen flex bg-slate-50 dark:bg-slate-900 overflow-hidden">
+    <AppSidebar />
 
-      <main class="min-h-screen flex-1 pl-64">
-        <AppTopbar />
+    <main class="flex-1 pl-64 h-screen overflow-y-auto">
+      <AppTopbar />
 
-        <div class="p-6">
-          <slot />
-        </div>
-      </main>
-    </div>
+      <div class="p-6">
+        <slot />
+      </div>
+    </main>
   </div>
 </template>
