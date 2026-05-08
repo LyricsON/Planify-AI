@@ -97,10 +97,10 @@ onMounted(async () => {
             </svg>
           </div>
           
-          <p class="text-[13px] font-semibold relative z-10 text-white tracking-wide">
+          <p class="text-[13px] font-semibold relative z-10 !text-white tracking-wide">
             Upgrade your plan
           </p>
-          <p class="mt-2 text-[11px] leading-[1.6] text-white/80 pr-12 relative z-10 font-medium">
+          <p class="mt-2 text-[11px] leading-[1.6] !text-white opacity-80 pr-12 relative z-10 font-medium">
             Unlock unlimited AI<br>
             features and more<br>
             productivity.

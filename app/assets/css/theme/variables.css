@@ -6,6 +6,7 @@
   --color-bg-soft: #f1f5f9;
   --color-surface: #ffffff;
   --color-surface-soft: #f8fafc;
+  --color-white: #ffffff;
   
   --color-border: #e2e8f0;
   --color-border-strong: #cbd5e1;
@@ -91,6 +92,7 @@
   --color-bg-soft: #1e293b;
   --color-surface: #1e293b;
   --color-surface-soft: #334155;
+  --color-white: #ffffff;
   
   --color-border: #334155;
   --color-border-strong: #475569;
