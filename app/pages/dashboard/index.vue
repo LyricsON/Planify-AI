@@ -202,15 +202,6 @@ onMounted(() => {
     <UIcon name="i-lucide-loader-2" class="size-8 animate-spin text-indigo-600" />
   </section>
   <section v-else class="max-w-[1400px] mx-auto pb-10">
-    <div class="mb-6">
-      <h1 class="text-[26px] font-bold text-slate-900 dark:text-white">
-        {{ greeting }}, {{ userName }}! 👋
-      </h1>
-      <p class="mt-1 text-[15px] text-slate-500 dark:text-slate-400">
-        Let's make today productive and focused.
-      </p>
-    </div>
-
     <!-- Main 2-Column Layout -->
     <div class="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-6">
       
@@ -220,167 +211,164 @@ onMounted(() => {
         <!-- 4 Compact Stat Cards -->
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <!-- Classes Today -->
-          <div class="bg-white dark:bg-slate-800 rounded-[16px] p-4 shadow-[0_2px_8px_-4px_rgba(0,0,0,0.05)] border border-slate-100 dark:border-slate-700">
+          <div class="rounded-[12px] p-4 shadow-[var(--shadow-card)] border border-[var(--color-border)]" style="background:var(--color-surface)">
             <div class="flex items-center gap-2.5">
-              <div class="flex size-8 items-center justify-center rounded-[8px] bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
+              <div class="flex size-8 items-center justify-center rounded-[8px]" style="background:color-mix(in srgb,var(--color-info) 10%,transparent);color:var(--color-info)">
                 <UIcon name="i-lucide-book-open" class="size-4" />
               </div>
-              <p class="text-[12px] font-bold text-slate-600 dark:text-slate-300">Classes Today</p>
+              <p class="text-[12px] font-bold" style="color:var(--color-text-soft)">Classes Today</p>
             </div>
-            <p class="mt-3 text-[26px] font-bold leading-none text-slate-900 dark:text-white">{{ classesToday.length }}</p>
-            <p class="mt-2 text-[11px] font-medium" :class="nextClass ? 'text-emerald-600' : 'text-slate-400'">
+            <p class="mt-3 text-[24px] font-bold leading-none" style="color:var(--color-text)">{{ classesToday.length }}</p>
+            <p class="mt-2 text-[11px] font-medium" :style="nextClass ? 'color:var(--color-success)' : 'color:var(--color-text-muted)'">
               {{ nextClass ? 'Next: ' + nextClass.title + ' - ' + formatTime(nextClass.start) : 'No more classes today' }}
             </p>
           </div>
-          
+
           <!-- Tasks Pending -->
-          <div class="bg-white dark:bg-slate-800 rounded-[16px] p-4 shadow-[0_2px_8px_-4px_rgba(0,0,0,0.05)] border border-slate-100 dark:border-slate-700">
+          <div class="rounded-[12px] p-4 shadow-[var(--shadow-card)] border border-[var(--color-border)]" style="background:var(--color-surface)">
             <div class="flex items-center gap-2.5">
-              <div class="flex size-8 items-center justify-center rounded-[8px] bg-orange-50 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400">
+              <div class="flex size-8 items-center justify-center rounded-[8px]" style="background:color-mix(in srgb,var(--color-warning) 12%,transparent);color:var(--color-warning)">
                 <UIcon name="i-lucide-file-check-2" class="size-4" />
               </div>
-              <p class="text-[12px] font-bold text-slate-600 dark:text-slate-300">Tasks Pending</p>
+              <p class="text-[12px] font-bold" style="color:var(--color-text-soft)">Tasks Pending</p>
             </div>
-            <p class="mt-3 text-[26px] font-bold leading-none text-slate-900 dark:text-white">{{ pendingTasks.length }}</p>
-            <p class="mt-2 text-[11px] font-medium" :class="highPriorityTasksCount > 0 ? 'text-red-500' : 'text-slate-400'">
+            <p class="mt-3 text-[24px] font-bold leading-none" style="color:var(--color-text)">{{ pendingTasks.length }}</p>
+            <p class="mt-2 text-[11px] font-medium" :style="highPriorityTasksCount > 0 ? 'color:var(--color-danger)' : 'color:var(--color-text-muted)'">
               {{ highPriorityTasksCount }} high priority
             </p>
           </div>
 
           <!-- Exams -->
-          <div class="bg-white dark:bg-slate-800 rounded-[16px] p-4 shadow-[0_2px_8px_-4px_rgba(0,0,0,0.05)] border border-slate-100 dark:border-slate-700">
+          <div class="rounded-[12px] p-4 shadow-[var(--shadow-card)] border border-[var(--color-border)]" style="background:var(--color-surface)">
             <div class="flex items-center gap-2.5">
-              <div class="flex size-8 items-center justify-center rounded-[8px] bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400">
+              <div class="flex size-8 items-center justify-center rounded-[8px]" style="background:color-mix(in srgb,var(--color-primary) 10%,transparent);color:var(--color-primary)">
                 <UIcon name="i-lucide-calendar" class="size-4" />
               </div>
-              <p class="text-[12px] font-bold text-slate-600 dark:text-slate-300">Exams</p>
+              <p class="text-[12px] font-bold" style="color:var(--color-text-soft)">Exams</p>
             </div>
-            <p class="mt-3 text-[26px] font-bold leading-none text-slate-900 dark:text-white">{{ upcomingExams.length }}</p>
-            <p class="mt-2 text-[11px] font-medium text-slate-400">
+            <p class="mt-3 text-[24px] font-bold leading-none" style="color:var(--color-text)">{{ upcomingExams.length }}</p>
+            <p class="mt-2 text-[11px] font-medium" style="color:var(--color-text-muted)">
               {{ nextExam ? 'Next: ' + formatDateShort(nextExam.examDate) : 'No upcoming exams' }}
             </p>
           </div>
 
           <!-- Productivity Score -->
-          <div class="bg-white dark:bg-slate-800 rounded-[16px] p-4 shadow-[0_2px_8px_-4px_rgba(0,0,0,0.05)] border border-slate-100 dark:border-slate-700">
+          <div class="rounded-[12px] p-4 shadow-[var(--shadow-card)] border border-[var(--color-border)]" style="background:var(--color-surface)">
             <div class="flex items-center gap-2.5">
-              <div class="flex size-8 items-center justify-center rounded-[8px] bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400">
+              <div class="flex size-8 items-center justify-center rounded-[8px]" style="background:color-mix(in srgb,var(--color-success) 10%,transparent);color:var(--color-success)">
                 <UIcon name="i-lucide-trending-up" class="size-4" />
               </div>
-              <p class="text-[12px] font-bold text-slate-600 dark:text-slate-300">Productivity Score</p>
+              <p class="text-[12px] font-bold" style="color:var(--color-text-soft)">Productivity Score</p>
             </div>
-            <p class="mt-3 text-[26px] font-bold leading-none text-slate-900 dark:text-white">{{ productivityScore }}%</p>
-            <p class="mt-2 text-[11px] font-medium text-emerald-600">
-              Good job!
-            </p>
+            <p class="mt-3 text-[24px] font-bold leading-none" style="color:var(--color-text)">{{ productivityScore }}%</p>
+            <p class="mt-2 text-[11px] font-medium" style="color:var(--color-success)">Good job!</p>
           </div>
         </div>
 
-        <!-- Today's Plan & AI Suggestion -->
-        <div class="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-6">
-          <!-- Today's Plan -->
-          <div class="bg-white dark:bg-slate-800 rounded-[20px] p-6 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] border border-slate-100 dark:border-slate-700 h-full">
-            <div class="flex items-center justify-between mb-6">
-              <div class="flex items-center gap-2">
-                <UIcon name="i-lucide-calendar-days" class="size-5 text-slate-800 dark:text-white" />
-                <h2 class="text-lg font-bold text-slate-900 dark:text-white">Today's Plan</h2>
-              </div>
-              <p class="text-[13px] text-slate-500 font-medium">{{ formatDateFull(new Date()) }}</p>
+        <!-- Today's Plan (unified card with AI Suggestion inside) -->
+        <div class="rounded-[12px] shadow-[var(--shadow-card)] border border-[var(--color-border)]" style="background:var(--color-surface)">
+          <!-- Card header -->
+          <div class="flex items-center justify-between px-6 pt-5 pb-4">
+            <div class="flex items-center gap-2">
+              <UIcon name="i-lucide-calendar-days" class="size-5 text-slate-700 dark:text-white" />
+              <h2 class="text-[16px] font-bold text-slate-900 dark:text-white">Today's Plan</h2>
             </div>
-            
-            <div class="relative pl-[52px]">
-              <div class="absolute left-[44px] top-4 bottom-4 w-[2px] bg-slate-100 dark:bg-slate-700"></div>
-              
-              <div v-if="todaysPlan.length === 0" class="text-sm text-slate-500 py-4 text-center">
-                No events scheduled for today.
-              </div>
-              
-              <div class="space-y-4 relative z-10">
-                <div v-for="plan in todaysPlan" :key="plan._id" class="relative flex items-center gap-4">
-                  <div class="absolute -left-[64px] w-[46px] text-right text-[12px] font-bold text-slate-500 pt-0.5 bg-white dark:bg-slate-800">
-                    {{ formatTime(plan.start) }}
-                  </div>
-                  <div class="absolute -left-[14px] flex items-center justify-center bg-white dark:bg-slate-800 py-1">
-                     <div class="size-[10px] rounded-full border-2 border-white dark:border-slate-800" :class="{
-                       'bg-blue-500': plan.type === 'course',
-                       'bg-emerald-500': plan.type === 'td' || plan.type === 'tp',
-                       'bg-indigo-500': plan.type === 'study_session',
-                       'bg-orange-500': plan.type === 'exam' || plan.type === 'task',
-                       'bg-slate-400': !['study_session', 'course', 'td', 'tp', 'exam', 'task'].includes(plan.type)
-                     }"></div>
-                  </div>
-                  
-                  <div class="flex-1 rounded-[16px] p-3 flex items-center gap-4 transition-all hover:bg-slate-50/50 dark:hover:bg-slate-800/50 cursor-pointer" :class="{
-                    'border border-indigo-100 dark:border-indigo-900/50 bg-indigo-50/30 dark:bg-indigo-900/10 border-dashed': plan.type === 'study_session',
-                    'border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm': plan.type !== 'study_session'
-                  }">
-                    <div class="flex size-[36px] flex-shrink-0 items-center justify-center rounded-[10px]" :class="{
-                      'text-blue-600 bg-blue-50 dark:bg-blue-900/30': plan.type === 'course',
-                      'text-emerald-600 bg-emerald-50 dark:bg-emerald-900/30': plan.type === 'td' || plan.type === 'tp',
-                      'text-indigo-600 bg-indigo-50 dark:bg-indigo-900/30': plan.type === 'study_session',
-                      'text-orange-600 bg-orange-50 dark:bg-orange-900/30': plan.type === 'exam' || plan.type === 'task',
-                      'text-slate-500 bg-slate-100 dark:bg-slate-700': !['study_session', 'course', 'td', 'tp', 'exam', 'task'].includes(plan.type)
+            <p class="text-[13px] text-slate-500 font-medium">{{ formatDateFull(new Date()) }}</p>
+          </div>
+
+          <!-- Two columns inside one card -->
+          <div class="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr]">
+            <!-- Left: Timeline -->
+            <div class="p-6">
+              <div class="relative pl-[52px]">
+                <div class="absolute left-[44px] top-4 bottom-4 w-[2px] bg-slate-100 dark:bg-slate-700"></div>
+                <div v-if="todaysPlan.length === 0" class="text-[16px] text-slate-500 py-4 text-center">
+                  No events scheduled for today.
+                </div>
+                <div class="space-y-4 relative z-10">
+                  <div v-for="plan in todaysPlan" :key="plan._id" class="relative flex items-center gap-4">
+                    <div class="absolute -left-[64px] w-[46px] text-right text-[12px] font-bold text-slate-500 pt-0.5 bg-white dark:bg-slate-800">
+                      {{ formatTime(plan.start) }}
+                    </div>
+                    <div class="absolute -left-[14px] flex items-center justify-center bg-white dark:bg-slate-800 py-1">
+                      <div class="size-[10px] rounded-full border-2 border-white dark:border-slate-800" :class="{
+                        'bg-blue-500': plan.type === 'course',
+                        'bg-emerald-500': plan.type === 'td' || plan.type === 'tp',
+                        'bg-indigo-500': plan.type === 'study_session',
+                        'bg-orange-500': plan.type === 'exam' || plan.type === 'task',
+                        'bg-slate-400': !['study_session', 'course', 'td', 'tp', 'exam', 'task'].includes(plan.type)
+                      }"></div>
+                    </div>
+                    <div class="flex-1 rounded-[10px] p-3 flex items-center gap-4 transition-all hover:bg-slate-50/50 dark:hover:bg-slate-800/50 cursor-pointer" :class="{
+                      'border border-indigo-100 dark:border-indigo-900/50 bg-indigo-50/30 dark:bg-indigo-900/10 border-dashed': plan.type === 'study_session',
+                      'border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm': plan.type !== 'study_session'
                     }">
-                      <UIcon v-if="plan.type === 'study_session'" name="i-lucide-sparkles" class="size-4" />
-                      <UIcon v-else-if="plan.type === 'course'" name="i-lucide-book-open" class="size-4" />
-                      <UIcon v-else-if="plan.type === 'td' || plan.type === 'tp'" name="i-lucide-calculator" class="size-4" />
-                      <UIcon v-else-if="plan.type === 'exam'" name="i-lucide-clipboard-check" class="size-4" />
-                      <UIcon v-else name="i-lucide-calendar" class="size-4" />
-                    </div>
-                    <div class="min-w-0 flex-1">
-                      <p class="font-bold text-[13px] truncate" :class="plan.type === 'study_session' ? 'text-indigo-700 dark:text-indigo-300' : 'text-slate-900 dark:text-white'">{{ plan.title }}</p>
-                      <p class="text-[11px] font-medium mt-0.5 truncate" :class="plan.type === 'study_session' ? 'text-indigo-500 dark:text-indigo-400' : 'text-slate-500'">{{ plan.location || (plan.type === 'study_session' ? 'AI Suggested' : plan.type.toUpperCase()) }}</p>
-                    </div>
-                    <div v-if="plan.type === 'study_session'" class="size-6 rounded-full border border-indigo-200 flex items-center justify-center mr-1">
-                      <UIcon name="i-lucide-plus" class="size-3.5 text-indigo-400" />
+                      <div class="flex size-[36px] flex-shrink-0 items-center justify-center rounded-[8px]" :class="{
+                        'text-blue-600 bg-blue-50 dark:bg-blue-900/30': plan.type === 'course',
+                        'text-emerald-600 bg-emerald-50 dark:bg-emerald-900/30': plan.type === 'td' || plan.type === 'tp',
+                        'text-indigo-600 bg-indigo-50 dark:bg-indigo-900/30': plan.type === 'study_session',
+                        'text-orange-600 bg-orange-50 dark:bg-orange-900/30': plan.type === 'exam' || plan.type === 'task',
+                        'text-slate-500 bg-slate-100 dark:bg-slate-700': !['study_session', 'course', 'td', 'tp', 'exam', 'task'].includes(plan.type)
+                      }">
+                        <UIcon v-if="plan.type === 'study_session'" name="i-lucide-sparkles" class="size-4" />
+                        <UIcon v-else-if="plan.type === 'course'" name="i-lucide-book-open" class="size-4" />
+                        <UIcon v-else-if="plan.type === 'td' || plan.type === 'tp'" name="i-lucide-calculator" class="size-4" />
+                        <UIcon v-else-if="plan.type === 'exam'" name="i-lucide-clipboard-check" class="size-4" />
+                        <UIcon v-else name="i-lucide-calendar" class="size-4" />
+                      </div>
+                      <div class="min-w-0 flex-1">
+                        <p class="font-bold text-[13px] truncate" :class="plan.type === 'study_session' ? 'text-indigo-700 dark:text-indigo-300' : 'text-slate-900 dark:text-white'">{{ plan.title }}</p>
+                        <p class="text-[11px] font-medium mt-0.5 truncate" :class="plan.type === 'study_session' ? 'text-indigo-500 dark:text-indigo-400' : 'text-slate-500'">{{ plan.location || (plan.type === 'study_session' ? 'AI Suggested' : plan.type.toUpperCase()) }}</p>
+                      </div>
+                      <div v-if="plan.type === 'study_session'" class="size-6 rounded-full border border-indigo-200 flex items-center justify-center mr-1">
+                        <UIcon name="i-lucide-plus" class="size-3.5 text-indigo-400" />
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          <!-- AI Suggestion -->
-          <div class="bg-white dark:bg-slate-800 rounded-[20px] p-6 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] border border-slate-100 dark:border-slate-700 flex flex-col h-full">
-            <div class="flex items-center gap-2 mb-2">
-              <UIcon name="i-lucide-sparkles" class="size-5 text-violet-500" />
-              <h2 class="text-[16px] font-bold text-slate-900 dark:text-white">AI Suggestion for You</h2>
-            </div>
-            <p class="text-[12px] text-slate-500 leading-relaxed font-medium">
-              Based on your courses and exams, here's your optimal plan for today.
-            </p>
-
-            <div v-if="isGeneratingPlan" class="flex-1 flex items-center justify-center py-10">
-              <UIcon name="i-lucide-loader-2" class="size-6 animate-spin text-violet-500" />
-            </div>
-            <div v-else-if="aiPlan" class="mt-5 flex-1 space-y-3">
-               <div v-for="(item, idx) in aiPlan.plan" :key="idx" class="flex items-center gap-3 border border-slate-100 dark:border-slate-700 rounded-[14px] p-3 shadow-sm bg-white dark:bg-slate-800">
+            <!-- Right: AI Suggestion -->
+            <div class="p-5 m-4 bg-[#f5f5fb] dark:bg-slate-900/40 rounded-[12px] border border-slate-200/60 dark:border-slate-700 flex flex-col">
+              <div class="flex items-center gap-2 mb-2">
+                <UIcon name="i-lucide-sparkles" class="size-5" style="color:var(--color-primary)" />
+                <h2 class="text-[16px] font-bold" style="color:var(--color-primary)">AI Suggestion for You</h2>
+              </div>
+              <p class="text-[13px] leading-relaxed font-medium mb-4" style="color:var(--color-text-muted)">
+                Based on your courses and exams, here's your optimal plan for today.
+              </p>
+              <div v-if="isGeneratingPlan" class="flex-1 flex items-center justify-center py-10">
+                <UIcon name="i-lucide-loader-2" class="size-6 animate-spin text-violet-500" />
+              </div>
+              <div v-else-if="aiPlan" class="flex-1 space-y-3">
+                <div v-for="(item, idx) in aiPlan.plan" :key="idx" class="flex items-center gap-3 rounded-[10px] p-3 border border-[var(--color-border)] shadow-[var(--shadow-sm)]" style="background:var(--color-surface)">
                   <UIcon name="i-lucide-check-circle-2" class="size-5 text-emerald-500 flex-shrink-0" />
                   <div class="min-w-0 flex-1">
                     <p class="text-[13px] font-bold text-slate-900 dark:text-white truncate">{{ item.activity }}</p>
-                    <p class="text-[11px] font-medium text-slate-500 truncate mt-0.5">{{ item.subject || 'Important' }} • {{ item.time }}</p>
+                    <p class="text-[11px] font-medium text-slate-500 truncate mt-0.5">{{ item.subject || 'Important' }}</p>
                   </div>
                   <UIcon name="i-lucide-arrow-right" class="size-4 text-slate-300 flex-shrink-0" />
-               </div>
+                </div>
+              </div>
+              <div v-else class="flex-1 flex items-center justify-center py-6">
+                <p class="text-[13px] text-slate-500">No suggestions available.</p>
+              </div>
+              <UButton block color="primary" variant="soft" class="mt-4 font-bold text-[16px] h-10 rounded-[8px] bg-violet-50 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 hover:bg-violet-100 transition" icon="i-lucide-refresh-cw" :loading="isGeneratingPlan" @click="generatePlan">
+                Generate new plan
+              </UButton>
             </div>
-            <div v-else class="flex-1 flex items-center justify-center py-10">
-              <p class="text-sm text-slate-500">No suggestions available.</p>
-            </div>
-
-            <UButton block color="primary" variant="soft" class="mt-5 font-bold text-[12px] h-10 rounded-[10px] bg-violet-50 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 hover:bg-violet-100 transition" icon="i-lucide-refresh-cw" :loading="isGeneratingPlan" @click="generatePlan">
-              Generate new plan
-            </UButton>
           </div>
         </div>
 
         <!-- Focus Plan -->
-        <div class="bg-gradient-to-r from-[#4f46e5] to-[#6366f1] rounded-[20px] p-8 text-white shadow-[0_8px_30px_-10px_rgba(79,70,229,0.4)] flex flex-col md:flex-row items-center justify-between gap-8">
+        <div class="bg-gradient-to-r from-[#4f46e5] to-[#6366f1] rounded-[12px] p-8 text-white shadow-[0_8px_30px_-10px_rgba(79,70,229,0.4)] flex flex-col md:flex-row items-center justify-between gap-8">
            <div>
               <p class="text-indigo-100 text-[12px] font-medium uppercase tracking-wider mb-2">Focus Plan</p>
               <h3 class="text-[26px] font-bold leading-[1.2] mb-2 tracking-tight">Stay consistent,<br>achieve your goals.</h3>
               <p class="text-indigo-100/90 text-[13px] font-medium">Your success is built one day at a time.</p>
            </div>
-           <div class="flex items-center gap-10 bg-white/10 rounded-[16px] p-5 backdrop-blur-md border border-white/10">
+           <div class="flex items-center gap-10 bg-white/10 rounded-[10px] p-5 backdrop-blur-md border border-white/10">
               <div class="text-center">
                 <p class="text-[12px] text-indigo-100 mb-3 font-semibold">This Week Progress</p>
                 <div class="relative size-[64px] mx-auto flex items-center justify-center rounded-full border-[4px] border-white/20 border-t-white">
@@ -404,11 +392,11 @@ onMounted(() => {
         <div class="bg-white dark:bg-slate-800 rounded-[20px] p-6 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] border border-slate-100 dark:border-slate-700">
           <div class="flex items-center justify-between mb-5">
             <h3 class="font-bold text-[16px] text-slate-900 dark:text-white">Recent Files</h3>
-            <NuxtLink to="/dashboard/files" class="text-[13px] font-bold text-indigo-600 hover:text-indigo-700">View all</NuxtLink>
+            <NuxtLink to="/dashboard/files" class="text-[16px] font-bold text-indigo-600 hover:text-indigo-700">View all</NuxtLink>
           </div>
           <div class="grid gap-4 md:grid-cols-3">
             <div v-if="files.length === 0" class="text-sm text-slate-500 py-2">No recent files.</div>
-            <div v-for="file in files" :key="file._id" class="flex flex-col border border-slate-100 dark:border-slate-700 rounded-[16px] p-4 shadow-sm hover:shadow-md transition bg-white dark:bg-slate-800">
+            <div v-for="file in files" :key="file._id" class="flex flex-col border border-slate-100 dark:border-slate-700 rounded-[10px] p-4 shadow-sm hover:shadow-md transition bg-white dark:bg-slate-800">
               <div class="flex items-center gap-3 mb-4">
                  <div class="flex size-[42px] flex-shrink-0 items-center justify-center rounded-[12px]" :class="{
                    'bg-red-50 text-red-500': file.type === 'pdf',
@@ -418,9 +406,9 @@ onMounted(() => {
                  }">
                    <UIcon :name="file.type === 'pdf' ? 'i-lucide-file-text' : 'i-lucide-file'" class="size-[20px]" />
                  </div>
-                 <p class="text-[13px] font-bold text-slate-900 dark:text-white truncate flex-1">{{ file.originalName || file.fileName }}</p>
+                 <p class="text-[16px] font-bold text-slate-900 dark:text-white truncate flex-1">{{ file.originalName || file.fileName }}</p>
               </div>
-              <p class="text-[11px] font-medium text-slate-500">{{ String(file.type).toUpperCase() }} • {{ (file.size / 1024 / 1024).toFixed(1) }} MB</p>
+              <p class="text-[16px] font-medium text-slate-500">{{ String(file.type).toUpperCase() }} • {{ (file.size / 1024 / 1024).toFixed(1) }} MB</p>
             </div>
           </div>
         </div>
@@ -435,41 +423,41 @@ onMounted(() => {
           <div class="flex items-center justify-between mb-5">
             <div class="flex items-center gap-2">
               <UIcon name="i-lucide-sparkles" class="size-5 text-indigo-500" />
-              <h2 class="text-[16px] font-bold text-slate-900 dark:text-white">AI Assistant</h2>
+              <h2 class="text-[24px] font-bold text-slate-900 dark:text-white">AI Assistant</h2>
             </div>
             <div class="size-8 rounded-full hover:bg-slate-50 flex items-center justify-center cursor-pointer transition">
                <UIcon name="i-lucide-more-horizontal" class="size-5 text-slate-400" />
             </div>
           </div>
 
-          <p class="text-[13px] font-medium text-slate-700 dark:text-slate-300 mb-5">
+          <p class="text-[16px] font-medium text-slate-700 dark:text-slate-300 mb-5">
             Hi {{ userName }}! How can I help you today?
           </p>
 
           <div class="flex-1 space-y-3">
             <template v-if="chatReplies.length === 0">
-              <div @click="sendChat('Summarize my course')" class="flex items-center gap-3 p-3 rounded-[12px] border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer transition shadow-sm">
+              <div @click="sendChat('Summarize my course')" class="flex items-center gap-3 p-3 rounded-[8px] border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer transition shadow-sm">
                  <div class="size-6 rounded-[6px] bg-indigo-50 flex items-center justify-center text-indigo-500">
                     <UIcon name="i-lucide-file-text" class="size-3.5" />
                  </div>
                  <span class="text-[12px] font-bold text-slate-700 dark:text-slate-200">Summarize my course</span>
               </div>
               
-              <div @click="sendChat('Create a study plan')" class="flex items-center gap-3 p-3 rounded-[12px] border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer transition shadow-sm">
+              <div @click="sendChat('Create a study plan')" class="flex items-center gap-3 p-3 rounded-[8px] border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer transition shadow-sm">
                  <div class="size-6 rounded-[6px] bg-indigo-50 flex items-center justify-center text-indigo-500">
                     <UIcon name="i-lucide-calendar" class="size-3.5" />
                  </div>
                  <span class="text-[12px] font-bold text-slate-700 dark:text-slate-200">Create a study plan</span>
               </div>
               
-              <div @click="sendChat('Generate exercises')" class="flex items-center gap-3 p-3 rounded-[12px] border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer transition shadow-sm">
+              <div @click="sendChat('Generate exercises')" class="flex items-center gap-3 p-3 rounded-[8px] border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer transition shadow-sm">
                  <div class="size-6 rounded-[6px] bg-indigo-50 flex items-center justify-center text-indigo-500">
                     <UIcon name="i-lucide-pencil" class="size-3.5" />
                  </div>
                  <span class="text-[12px] font-bold text-slate-700 dark:text-slate-200">Generate exercises</span>
               </div>
               
-              <div @click="sendChat('What should I study today?')" class="flex items-center gap-3 p-3 rounded-[12px] border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer transition shadow-sm">
+              <div @click="sendChat('What should I study today?')" class="flex items-center gap-3 p-3 rounded-[8px] border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer transition shadow-sm">
                  <div class="size-6 rounded-[6px] bg-indigo-50 flex items-center justify-center text-indigo-500">
                     <UIcon name="i-lucide-message-circle" class="size-3.5" />
                  </div>
@@ -490,7 +478,7 @@ onMounted(() => {
                  placeholder="Ask anything..."
                  @keyup.enter="sendChat()"
                  :disabled="isSendingChat"
-                 class="w-full h-[42px] bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-[13px] rounded-[12px] pl-4 pr-12 focus:outline-none focus:border-indigo-400 font-medium placeholder:text-slate-400"
+                 class="w-full h-[42px] bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-[16px] rounded-[12px] pl-4 pr-12 focus:outline-none focus:border-indigo-400 font-medium placeholder:text-slate-400"
                />
                <button @click="sendChat()" class="absolute right-1.5 size-[30px] bg-[#4f46e5] hover:bg-indigo-600 transition rounded-[8px] flex items-center justify-center cursor-pointer disabled:opacity-50">
                  <UIcon name="i-lucide-send" class="size-[14px] text-white" />
@@ -524,7 +512,7 @@ onMounted(() => {
                     <span class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">{{ getDayMonth(item.date).month }}</span>
                  </div>
                  <div class="min-w-0 flex-1 pl-1">
-                    <p class="text-[13px] font-bold text-slate-900 dark:text-white truncate">{{ item.title }}</p>
+                    <p class="text-[16px] font-bold text-slate-900 dark:text-white truncate">{{ item.title }}</p>
                     <p class="text-[11px] font-medium text-slate-500 mt-1">{{ formatDateShort(item.date) }} • {{ formatTime(item.date.toISOString()) || '10:00 AM' }}</p>
                  </div>
                  <span class="text-[10px] px-2.5 py-1 rounded-md font-bold whitespace-nowrap tracking-wide uppercase" :class="getDaysUntilClass(item.date)">
@@ -547,12 +535,12 @@ onMounted(() => {
                  <UIcon name="i-lucide-book-open" class="size-5" />
                </div>
                <div class="min-w-0 flex-1 relative pr-[38px]">
-                 <p class="text-[13px] font-bold text-slate-900 dark:text-white truncate">{{ course.title }}</p>
-                 <p class="text-[11px] font-medium text-slate-500 mt-1">{{ course.teacher || 'Prof. Smith' }} • {{ course.semester || 'Fall 2024' }}</p>
+                 <p class="text-[16px] font-bold text-slate-900 dark:text-white truncate">{{ course.title }}</p>
+                 <p class="text-[16px] font-medium text-slate-500 mt-1">{{ course.teacher || 'Prof. Smith' }} • {{ course.semester || 'Fall 2024' }}</p>
                  <div class="mt-2.5 w-full bg-slate-100 dark:bg-slate-700 h-[6px] rounded-full overflow-hidden">
                     <div class="bg-emerald-500 h-full rounded-full" :style="`width: ${course.progress || 75}%`"></div>
                  </div>
-                 <span class="absolute right-0 bottom-[-2px] text-[11px] font-bold text-slate-600">{{ course.progress || 75 }}%</span>
+                 <span class="absolute right-0 bottom-[-2px] text-[16px] font-bold text-slate-600">{{ course.progress || 75 }}%</span>
                </div>
              </div>
           </div>
