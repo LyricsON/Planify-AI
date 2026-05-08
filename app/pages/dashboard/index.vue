@@ -270,10 +270,10 @@ onMounted(() => {
           <!-- Card header -->
           <div class="flex items-center justify-between px-6 pt-5 pb-4">
             <div class="flex items-center gap-2">
-              <UIcon name="i-lucide-calendar-days" class="size-5 text-slate-700 dark:text-white" />
-              <h2 class="text-[16px] font-bold text-slate-900 dark:text-white">Today's Plan</h2>
+              <UIcon name="i-lucide-calendar-days" class="size-4" style="color:var(--color-text)" />
+              <h2 class="text-[15px] font-bold" style="color:var(--color-text)">Today's Plan</h2>
             </div>
-            <p class="text-[13px] text-slate-500 font-medium">{{ formatDateFull(new Date()) }}</p>
+            <p class="text-[12px] font-medium" style="color:var(--color-text-muted)">{{ formatDateFull(new Date()) }}</p>
           </div>
 
           <!-- Two columns inside one card -->
@@ -364,55 +364,60 @@ onMounted(() => {
         </div>
 
         <!-- Focus Plan -->
-        <div class="bg-gradient-to-r from-[#4f46e5] to-[#6366f1] rounded-[12px] p-8 text-white shadow-[0_8px_30px_-10px_rgba(79,70,229,0.4)] flex flex-col md:flex-row items-center justify-between gap-8">
+        <div class="rounded-[14px] p-6 text-white flex flex-col md:flex-row items-center justify-between gap-6" style="background:linear-gradient(135deg,#4f46e5 0%,#6366f1 60%,#818cf8 100%);box-shadow:0 8px 32px -8px rgba(79,70,229,0.45)">
            <div>
-              <p class="text-indigo-100 text-[12px] font-medium uppercase tracking-wider mb-2">Focus Plan</p>
-              <h3 class="text-[26px] font-bold leading-[1.2] mb-2 tracking-tight">Stay consistent,<br>achieve your goals.</h3>
-              <p class="text-indigo-100/90 text-[13px] font-medium">Your success is built one day at a time.</p>
+              <p class="text-[12px] font-semibold uppercase tracking-wider mb-2" style="color:rgba(255,255,255,0.75)">Focus Plan</p>
+              <h3 style="color:#fff;font-size:22px;font-weight:700;line-height:1.25;margin-bottom:6px">Stay consistent,<br>achieve your goals.</h3>
+              <p class="text-[13px] font-medium" style="color:rgba(255,255,255,0.7)">Your success is built one day at a time.</p>
            </div>
-           <div class="flex items-center gap-10 bg-white/10 rounded-[10px] p-5 backdrop-blur-md border border-white/10">
-              <div class="text-center">
-                <p class="text-[12px] text-indigo-100 mb-3 font-semibold">This Week Progress</p>
-                <div class="relative size-[64px] mx-auto flex items-center justify-center rounded-full border-[4px] border-white/20 border-t-white">
-                   <span class="font-bold text-lg">65%</span>
+           <div class="flex items-start gap-6 rounded-[12px] px-6 py-4" style="background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.15)">
+              <div class="flex flex-col items-center">
+                <p class="text-[11px] font-semibold mb-2" style="color:rgba(255,255,255,0.8)">This Week Progress</p>
+                <div class="relative flex items-center justify-center" style="width:72px;height:72px">
+                  <svg width="72" height="72" viewBox="0 0 72 72" style="position:absolute;top:0;left:0;transform:rotate(-90deg)">
+                    <circle cx="36" cy="36" r="29" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="6"/>
+                    <circle cx="36" cy="36" r="29" fill="none" stroke="#10b981" stroke-width="6" stroke-dasharray="182.2" stroke-dashoffset="63.8" stroke-linecap="round"/>
+                  </svg>
+                  <span class="relative text-[15px] font-bold" style="color:#fff">65%</span>
                 </div>
-                <p class="text-[10px] text-indigo-100 mt-3 font-bold uppercase tracking-wider">Great progress!</p>
+                <p class="text-[10px] font-bold uppercase tracking-wider mt-2" style="color:rgba(255,255,255,0.8)">Great progress!</p>
               </div>
-              <div class="flex items-end gap-3 h-[72px]">
-                 <div class="flex flex-col items-center gap-1.5"><div class="w-2 rounded-full bg-white/30 h-8"></div><span class="text-[9px] font-bold text-indigo-100 uppercase">Mon</span></div>
-                 <div class="flex flex-col items-center gap-1.5"><div class="w-2 rounded-full bg-white/30 h-10"></div><span class="text-[9px] font-bold text-indigo-100 uppercase">Tue</span></div>
-                 <div class="flex flex-col items-center gap-1.5"><div class="w-2 rounded-full bg-white h-16 shadow-[0_0_12px_rgba(255,255,255,0.6)]"></div><span class="text-[9px] font-bold text-white uppercase">Wed</span></div>
-                 <div class="flex flex-col items-center gap-1.5"><div class="w-2 rounded-full bg-white/30 h-9"></div><span class="text-[9px] font-bold text-indigo-100 uppercase">Thu</span></div>
-                 <div class="flex flex-col items-center gap-1.5"><div class="w-2 rounded-full bg-white/30 h-12"></div><span class="text-[9px] font-bold text-indigo-100 uppercase">Fri</span></div>
-                 <div class="flex flex-col items-center gap-1.5"><div class="w-2 rounded-full bg-white/30 h-6"></div><span class="text-[9px] font-bold text-indigo-100 uppercase">Sat</span></div>
-                 <div class="flex flex-col items-center gap-1.5"><div class="w-2 rounded-full bg-white/30 h-8"></div><span class="text-[9px] font-bold text-indigo-100 uppercase">Sun</span></div>
+              <div class="flex items-end gap-2.5 mt-7" style="height:72px">
+                 <div class="flex flex-col items-center gap-1.5"><div class="w-[8px] rounded-full" style="height:32px;background:#10b981"></div><span class="text-[9px] font-bold uppercase" style="color:rgba(255,255,255,0.7)">Mon</span></div>
+                 <div class="flex flex-col items-center gap-1.5"><div class="w-[8px] rounded-full" style="height:40px;background:#10b981"></div><span class="text-[9px] font-bold uppercase" style="color:rgba(255,255,255,0.7)">Tue</span></div>
+                 <div class="flex flex-col items-center gap-1.5"><div class="w-[8px] rounded-full" style="height:64px;background:#10b981;box-shadow:0 0 10px rgba(16,185,129,0.7)"></div><span class="text-[9px] font-bold uppercase" style="color:#fff">Wed</span></div>
+                 <div class="flex flex-col items-center gap-1.5"><div class="w-[8px] rounded-full" style="height:36px;background:#10b981"></div><span class="text-[9px] font-bold uppercase" style="color:rgba(255,255,255,0.7)">Thu</span></div>
+                 <div class="flex flex-col items-center gap-1.5"><div class="w-[8px] rounded-full" style="height:44px;background:#10b981"></div><span class="text-[9px] font-bold uppercase" style="color:rgba(255,255,255,0.7)">Fri</span></div>
+                 <div class="flex flex-col items-center gap-1.5"><div class="w-[8px] rounded-full" style="height:24px;background:rgba(255,255,255,0.18)"></div><span class="text-[9px] font-bold uppercase" style="color:rgba(255,255,255,0.55)">Sat</span></div>
+                 <div class="flex flex-col items-center gap-1.5"><div class="w-[8px] rounded-full" style="height:20px;background:rgba(255,255,255,0.18)"></div><span class="text-[9px] font-bold uppercase" style="color:rgba(255,255,255,0.55)">Sun</span></div>
               </div>
            </div>
         </div>
 
+
         <!-- Recent Files -->
         <div class="p-6" style="background:var(--color-surface);border-radius:16px;border:1px solid var(--color-border);box-shadow:var(--shadow-card)">
-          <div class="flex items-center justify-between mb-5">
-            <h3 class="font-bold text-[16px] text-slate-900 dark:text-white">Recent Files</h3>
-            <NuxtLink to="/dashboard/files" class="text-[16px] font-bold text-indigo-600 hover:text-indigo-700">View all</NuxtLink>
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="font-bold text-[14px]" style="color:var(--color-text)">Recent Files</h3>
+            <NuxtLink to="/dashboard/files" class="text-[12px] font-bold" style="color:var(--color-primary)">View all</NuxtLink>
           </div>
           <div class="grid gap-4 md:grid-cols-3">
-            <div v-if="files.length === 0" class="text-sm text-slate-500 py-2">No recent files.</div>
-            <div v-for="file in files" :key="file._id" class="flex flex-col p-4 transition" style="border-radius:10px;border:1px solid var(--color-border);background:var(--color-surface);box-shadow:var(--shadow-sm)">
-              <div class="flex items-center gap-3 mb-4">
-                 <div class="flex size-[42px] flex-shrink-0 items-center justify-center"
-                   :style="[
-                     'border-radius:12px',
-                     file.type==='pdf' ? 'background:#fef2f2;color:#ef4444' :
-                     file.type==='xlsx' ? 'background:#f0fdf4;color:#22c55e' :
-                     file.type==='docx' ? 'background:#eff6ff;color:#3b82f6' :
-                     'background:var(--color-border);color:var(--color-text-muted)'
-                   ].join(';')">
-                   <UIcon :name="file.type === 'pdf' ? 'i-lucide-file-text' : 'i-lucide-file'" class="size-[20px]" />
-                 </div>
-                 <p class="text-[16px] font-bold text-slate-900 dark:text-white truncate flex-1">{{ file.originalName || file.fileName }}</p>
-              </div>
-              <p class="text-[16px] font-medium text-slate-500">{{ String(file.type).toUpperCase() }} • {{ (file.size / 1024 / 1024).toFixed(1) }} MB</p>
+            <div v-if="files.length === 0" class="text-[13px] col-span-3 py-4 text-center" style="color:var(--color-text-muted)">No recent files.</div>
+            <div v-for="file in files" :key="file._id" class="flex items-center gap-3 p-4 transition" style="border-radius:10px;border:1px solid var(--color-border);background:var(--color-surface);box-shadow:var(--shadow-sm)">
+               <div class="flex size-[40px] flex-shrink-0 items-center justify-center"
+                 :style="[
+                   'border-radius:10px',
+                   file.type==='pdf'  ? 'background:#fef2f2;color:#ef4444' :
+                   file.type==='xlsx' ? 'background:#f0fdf4;color:#22c55e' :
+                   file.type==='docx' ? 'background:#eff6ff;color:#3b82f6' :
+                   'background:var(--color-border);color:var(--color-text-muted)'
+                 ].join(';')">
+                 <UIcon :name="file.type === 'pdf' ? 'i-lucide-file-text' : file.type==='docx' ? 'i-lucide-file-type' : 'i-lucide-file'" class="size-[18px]" />
+               </div>
+               <div class="min-w-0 flex-1">
+                 <p class="text-[13px] font-bold truncate" style="color:var(--color-text)">{{ file.originalName || file.fileName }}</p>
+                 <p class="text-[11px] mt-0.5" style="color:var(--color-text-muted)">{{ String(file.type||'file').toUpperCase() }} • {{ (file.size/1024/1024).toFixed(1) }} MB</p>
+               </div>
             </div>
           </div>
         </div>
@@ -424,17 +429,17 @@ onMounted(() => {
         
         <!-- AI Assistant -->
         <div class="p-6 flex flex-col" style="background:var(--color-surface);border-radius:16px;border:1px solid var(--color-border);box-shadow:var(--shadow-card)">
-          <div class="flex items-center justify-between mb-5">
+          <div class="flex items-center justify-between mb-4">
             <div class="flex items-center gap-2">
-              <UIcon name="i-lucide-sparkles" class="size-5 text-indigo-500" />
-              <h2 class="text-[24px] font-bold text-slate-900 dark:text-white">AI Assistant</h2>
+              <UIcon name="i-lucide-sparkles" class="size-4" style="color:var(--color-primary)" />
+              <h2 class="text-[15px] font-bold" style="color:var(--color-text)">AI Assistant</h2>
             </div>
-            <div class="size-8 rounded-full hover:bg-slate-50 flex items-center justify-center cursor-pointer transition">
-               <UIcon name="i-lucide-more-horizontal" class="size-5 text-slate-400" />
+            <div class="size-7 rounded-full hover:bg-slate-50 flex items-center justify-center cursor-pointer transition">
+               <UIcon name="i-lucide-more-horizontal" class="size-4 text-slate-400" />
             </div>
           </div>
 
-          <p class="text-[16px] font-medium text-slate-700 dark:text-slate-300 mb-5">
+          <p class="text-[13px] font-medium mb-4" style="color:var(--color-text-muted)">
             Hi {{ userName }}! How can I help you today?
           </p>
 
@@ -507,25 +512,25 @@ onMounted(() => {
         </div>
 
         <!-- Upcoming -->
-        <div class="p-6" style="background:var(--color-surface);border-radius:16px;border:1px solid var(--color-border);box-shadow:var(--shadow-card)">
-           <div class="flex items-center justify-between mb-6">
-              <h3 class="font-bold text-[16px] text-slate-900 dark:text-white">Upcoming</h3>
-              <NuxtLink to="/dashboard/schedule" class="text-[13px] font-bold text-indigo-600 hover:text-indigo-700">View all</NuxtLink>
+        <div class="p-5" style="background:var(--color-surface);border-radius:16px;border:1px solid var(--color-border);box-shadow:var(--shadow-card)">
+           <div class="flex items-center justify-between mb-4">
+              <h3 class="font-bold text-[14px]" style="color:var(--color-text)">Upcoming</h3>
+              <NuxtLink to="/dashboard/schedule" class="text-[12px] font-bold" style="color:var(--color-primary)">View all</NuxtLink>
            </div>
            
-           <div class="space-y-5">
-              <div v-if="upcomingItems.length === 0" class="text-[13px] text-slate-500 py-2 font-medium">No upcoming items.</div>
-              <div v-for="(item, idx) in upcomingItems" :key="item.id" class="flex gap-4 items-center"
-                 :style="idx !== upcomingItems.length - 1 ? 'padding-bottom:20px;border-bottom:1px solid var(--color-border)' : ''">
-                 <div class="w-[42px] text-center flex-shrink-0 flex flex-col justify-center pr-4" style="border-right:1px solid var(--color-border)">
-                    <span class="text-[20px] font-bold text-slate-900 dark:text-white leading-none">{{ getDayMonth(item.date).day }}</span>
-                    <span class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">{{ getDayMonth(item.date).month }}</span>
+           <div class="space-y-4">
+              <div v-if="upcomingItems.length === 0" class="text-[12px] py-2" style="color:var(--color-text-muted)">No upcoming items.</div>
+              <div v-for="(item, idx) in upcomingItems" :key="item.id" class="flex gap-3 items-center"
+                 :style="idx !== upcomingItems.length - 1 ? 'padding-bottom:16px;border-bottom:1px solid var(--color-border)' : ''">
+                 <div class="w-[38px] text-center flex-shrink-0 flex flex-col justify-center pr-3" style="border-right:1px solid var(--color-border)">
+                    <span class="text-[18px] font-bold leading-none" style="color:var(--color-text)">{{ getDayMonth(item.date).day }}</span>
+                    <span class="text-[9px] font-bold uppercase tracking-widest mt-0.5" style="color:var(--color-text-muted)">{{ getDayMonth(item.date).month }}</span>
                  </div>
-                 <div class="min-w-0 flex-1 pl-1">
-                    <p class="text-[16px] font-bold text-slate-900 dark:text-white truncate">{{ item.title }}</p>
-                    <p class="text-[11px] font-medium text-slate-500 mt-1">{{ formatDateShort(item.date) }} • {{ formatTime(item.date.toISOString()) || '10:00 AM' }}</p>
+                 <div class="min-w-0 flex-1">
+                    <p class="text-[13px] font-bold truncate" style="color:var(--color-text)">{{ item.title }}</p>
+                    <p class="text-[11px] font-medium mt-0.5" style="color:var(--color-text-muted)">{{ formatDateShort(item.date) }} • {{ formatTime(item.date.toISOString()) || '10:00 AM' }}</p>
                  </div>
-                 <span class="text-[10px] px-2.5 py-1 font-bold whitespace-nowrap tracking-wide uppercase" :class="getDaysUntilClass(item.date)" style="border-radius:6px">
+                 <span class="text-[10px] px-2 py-0.5 font-bold whitespace-nowrap uppercase" :class="getDaysUntilClass(item.date)" style="border-radius:5px">
                     {{ getDaysUntil(item.date) }}
                  </span>
               </div>
@@ -533,25 +538,25 @@ onMounted(() => {
         </div>
 
         <!-- Recent Courses -->
-        <div class="p-6" style="background:var(--color-surface);border-radius:16px;border:1px solid var(--color-border);box-shadow:var(--shadow-card)">
-          <div class="flex items-center justify-between mb-6">
-             <h3 class="font-bold text-[16px] text-slate-900 dark:text-white">Recent Courses</h3>
-             <NuxtLink to="/dashboard/courses" class="text-[13px] font-bold text-indigo-600 hover:text-indigo-700">View all</NuxtLink>
+        <div class="p-5" style="background:var(--color-surface);border-radius:16px;border:1px solid var(--color-border);box-shadow:var(--shadow-card)">
+          <div class="flex items-center justify-between mb-4">
+             <h3 class="font-bold text-[14px]" style="color:var(--color-text)">Recent Courses</h3>
+             <NuxtLink to="/dashboard/courses" class="text-[12px] font-bold" style="color:var(--color-primary)">View all</NuxtLink>
           </div>
           <div class="space-y-4">
-             <div v-if="courses.length === 0" class="text-[13px] text-slate-500 py-2 font-medium">No recent courses.</div>
-             <div v-for="course in courses" :key="course._id" class="flex items-center gap-4">
-               <div class="flex size-[42px] flex-shrink-0 items-center justify-center" style="border-radius:12px;background:color-mix(in srgb,var(--color-primary) 10%,transparent);color:var(--color-primary);box-shadow:var(--shadow-sm)">
-                 <UIcon name="i-lucide-book-open" class="size-5" />
+             <div v-if="courses.length === 0" class="text-[12px] py-2" style="color:var(--color-text-muted)">No recent courses.</div>
+             <div v-for="course in courses" :key="course._id" class="flex items-center gap-3">
+               <div class="flex size-[38px] flex-shrink-0 items-center justify-center" style="border-radius:10px;background:color-mix(in srgb,var(--color-primary) 10%,transparent);color:var(--color-primary)">
+                 <UIcon name="i-lucide-book-open" class="size-4" />
                </div>
-               <div class="min-w-0 flex-1 relative pr-[38px]">
-                 <p class="text-[16px] font-bold text-slate-900 dark:text-white truncate">{{ course.title }}</p>
-                 <p class="text-[16px] font-medium text-slate-500 mt-1">{{ course.teacher || 'Prof. Smith' }} • {{ course.semester || 'Fall 2024' }}</p>
-                 <div class="mt-2.5 w-full bg-slate-100 dark:bg-slate-700 h-[6px] rounded-full overflow-hidden">
-                    <div class="bg-emerald-500 h-full rounded-full" :style="`width: ${course.progress || 75}%`"></div>
+               <div class="min-w-0 flex-1">
+                 <p class="text-[13px] font-bold truncate" style="color:var(--color-text)">{{ course.title }}</p>
+                 <p class="text-[11px] mt-0.5" style="color:var(--color-text-muted)">{{ course.teacher || 'Prof. Smith' }} • {{ course.semester || 'Fall 2024' }}</p>
+                 <div class="mt-2 w-full h-[5px] rounded-full overflow-hidden" style="background:var(--color-border)">
+                    <div class="h-full rounded-full" style="background:var(--color-success)" :style="`width:${course.progress||75}%`"></div>
                  </div>
-                 <span class="absolute right-0 bottom-[-2px] text-[16px] font-bold text-slate-600">{{ course.progress || 75 }}%</span>
                </div>
+               <span class="text-[12px] font-bold flex-shrink-0" style="color:var(--color-text-muted)">{{ course.progress||75 }}%</span>
              </div>
           </div>
         </div>
