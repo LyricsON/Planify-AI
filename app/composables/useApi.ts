@@ -9,11 +9,12 @@ export interface ApiResponse<T = unknown> {
   page?: number
   pages?: number
   message?: string
+  token?: string
 }
 
 const AUTH_TOKEN_KEY = 'planify_token'
 
-function getToken(): string | null {
+export function getToken(): string | null {
   if (import.meta.client) {
     return localStorage.getItem(AUTH_TOKEN_KEY)
   }

@@ -5,6 +5,9 @@ definePageMeta({
   layout: 'auth'
 })
 
+const { post } = useApi()
+const { saveAuthToken } = useAuth()
+
 const form = reactive({
   fullName: '',
   email: '',
@@ -17,24 +20,50 @@ const form = reactive({
 const showPassword = ref(false)
 const showConfirmPassword = ref(false)
 const isLoading = ref(false)
+const errorMessage = ref('')
 
 const roleOptions = ['Student', 'Worker', 'Freelancer', 'Entrepreneur']
 
 const onSubmit = async () => {
-  if (!form.fullName || !form.email || !form.password || !form.confirmPassword) return
+  if (!form.fullName || !form.email || !form.password || !form.confirmPassword || isLoading.value) return
+
+  errorMessage.value = ''
+
   if (form.password !== form.confirmPassword) {
-    alert("Passwords don't match")
+    errorMessage.value = 'Passwords don\'t match.'
     return
   }
+
+  if (form.password.length < 8) {
+    errorMessage.value = 'Password must be at least 8 characters.'
+    return
+  }
+
   if (!form.terms) {
-    alert('Please agree to the Terms of Service')
+    errorMessage.value = 'Please agree to the Terms of Service and Privacy Policy.'
     return
   }
 
   isLoading.value = true
-  await new Promise(resolve => setTimeout(resolve, 500))
-  console.log('Sign up payload:', form)
-  isLoading.value = false
+  try {
+    const response = await post('/auth/register', {
+      name: form.fullName.trim(),
+      email: form.email.trim().toLowerCase(),
+      password: form.password
+    })
+
+    if (!response.success || !response.token) {
+      errorMessage.value = response.message || 'Unable to create your account. Please try again.'
+      return
+    }
+
+    saveAuthToken(response.token)
+    await navigateTo('/dashboard')
+  } catch {
+    errorMessage.value = 'Unable to reach the server. Check that the backend is running and try again.'
+  } finally {
+    isLoading.value = false
+  }
 }
 </script>
 
@@ -46,6 +75,14 @@ const onSubmit = async () => {
     align="start"
   >
     <form @submit.prevent="onSubmit" class="space-y-4">
+      <div
+        v-if="errorMessage"
+        class="flex items-start gap-3 rounded-[1rem] border border-[color-mix(in_srgb,var(--color-danger)_24%,transparent)] bg-[color-mix(in_srgb,var(--color-danger)_10%,var(--color-card-bg))] px-4 py-3 text-[14px] leading-6 text-[color-mix(in_srgb,var(--color-danger)_78%,var(--color-text))]"
+      >
+        <UIcon name="i-lucide-circle-alert" class="mt-1 h-4 w-4 shrink-0" />
+        <span>{{ errorMessage }}</span>
+      </div>
+
       <label class="block space-y-2.5">
         <span class="text-[13px] font-semibold text-[var(--color-text)]">Full name</span>
         <div class="flex h-12 items-center gap-3 rounded-[1rem] border border-[var(--color-border)] bg-[var(--color-input-bg)] px-4">
@@ -163,10 +200,11 @@ const onSubmit = async () => {
 
       <button
         type="button"
-        class="flex h-12 w-full items-center justify-center gap-3 rounded-[1rem] border border-[var(--color-border)] bg-[var(--color-input-bg)] px-6 text-[14px] font-semibold text-[var(--color-text)] transition-colors hover:bg-[var(--color-bg-soft)]"
+        disabled
+        class="flex h-12 w-full items-center justify-center gap-3 rounded-[1rem] border border-[var(--color-border)] bg-[var(--color-input-bg)] px-6 text-[14px] font-semibold text-[var(--color-text)] opacity-70 transition-colors hover:bg-[var(--color-bg-soft)] disabled:cursor-not-allowed"
       >
         <UIcon name="i-simple-icons-google" class="h-5 w-5" />
-        <span>Continue with Google</span>
+        <span>Google sign-up coming soon</span>
       </button>
 
       <p class="pt-0.5 text-center text-[14px] text-[var(--color-text-muted)]">
@@ -184,8 +222,12 @@ const onSubmit = async () => {
             <UIcon name="i-lucide-gift" class="h-6 w-6" />
           </div>
           <div class="min-w-0 flex-1">
-            <h4 class="text-[0.97rem] font-bold text-[var(--color-text)]">Start free for 1 month</h4>
-            <p class="mt-1 text-[0.86rem] leading-[1.45] text-[var(--color-text-soft)]">Get full access to all AI features and 10,000 starter tokens.</p>
+            <h4 class="text-[0.97rem] font-bold text-[var(--color-text)]">
+              Start free for 1 month
+            </h4>
+            <p class="mt-1 text-[0.86rem] leading-[1.45] text-[var(--color-text-soft)]">
+              Get full access to all AI features and 10,000 starter tokens.
+            </p>
           </div>
           <UIcon name="i-lucide-sparkles" class="absolute right-1 top-1 h-5 w-5 text-[var(--color-ai)]/30" />
           <UIcon name="i-lucide-sparkles" class="absolute bottom-0 right-10 h-4 w-4 text-[var(--color-ai)]/20" />
