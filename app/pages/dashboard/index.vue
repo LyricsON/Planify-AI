@@ -281,16 +281,16 @@ onMounted(() => {
             <!-- Left: Timeline -->
             <div class="p-6">
               <div class="relative pl-[52px]">
-                <div class="absolute left-[44px] top-4 bottom-4 w-[2px] bg-slate-100 dark:bg-slate-700"></div>
+                <div class="absolute left-[44px] top-4 bottom-4 w-[2px]" style="background:var(--color-border)"></div>
                 <div v-if="todaysPlan.length === 0" class="text-[16px] text-slate-500 py-4 text-center">
                   No events scheduled for today.
                 </div>
                 <div class="space-y-4 relative z-10">
                   <div v-for="plan in todaysPlan" :key="plan._id" class="relative flex items-center gap-4">
-                    <div class="absolute -left-[64px] w-[46px] text-right text-[12px] font-bold text-slate-500 pt-0.5 bg-white dark:bg-slate-800">
+                    <div class="absolute -left-[64px] w-[46px] text-right text-[12px] font-bold pt-0.5" style="color:var(--color-text-soft);background:var(--color-surface)">
                       {{ formatTime(plan.start) }}
                     </div>
-                    <div class="absolute -left-[14px] flex items-center justify-center bg-white dark:bg-slate-800 py-1">
+                    <div class="absolute -left-[14px] flex items-center justify-center py-1" style="background:var(--color-surface)">
                       <div class="size-[10px] rounded-full border-2 border-white dark:border-slate-800" :class="{
                         'bg-blue-500': plan.type === 'course',
                         'bg-emerald-500': plan.type === 'td' || plan.type === 'tp',
@@ -299,17 +299,19 @@ onMounted(() => {
                         'bg-slate-400': !['study_session', 'course', 'td', 'tp', 'exam', 'task'].includes(plan.type)
                       }"></div>
                     </div>
-                    <div class="flex-1 rounded-[10px] p-3 flex items-center gap-4 transition-all hover:bg-slate-50/50 dark:hover:bg-slate-800/50 cursor-pointer" :class="{
-                      'border border-indigo-100 dark:border-indigo-900/50 bg-indigo-50/30 dark:bg-indigo-900/10 border-dashed': plan.type === 'study_session',
-                      'border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm': plan.type !== 'study_session'
-                    }">
-                      <div class="flex size-[36px] flex-shrink-0 items-center justify-center rounded-[8px]" :class="{
-                        'text-blue-600 bg-blue-50 dark:bg-blue-900/30': plan.type === 'course',
-                        'text-emerald-600 bg-emerald-50 dark:bg-emerald-900/30': plan.type === 'td' || plan.type === 'tp',
-                        'text-indigo-600 bg-indigo-50 dark:bg-indigo-900/30': plan.type === 'study_session',
-                        'text-orange-600 bg-orange-50 dark:bg-orange-900/30': plan.type === 'exam' || plan.type === 'task',
-                        'text-slate-500 bg-slate-100 dark:bg-slate-700': !['study_session', 'course', 'td', 'tp', 'exam', 'task'].includes(plan.type)
-                      }">
+                    <div class="flex-1 p-3 flex items-center gap-4 transition-all cursor-pointer"
+                      :style="plan.type === 'study_session'
+                        ? 'border-radius:10px;border:1px dashed var(--color-primary);background:color-mix(in srgb,var(--color-primary) 6%,transparent)'
+                        : 'border-radius:10px;border:1px solid var(--color-border);background:var(--color-surface);box-shadow:var(--shadow-sm)'">
+                      <div class="flex size-[36px] flex-shrink-0 items-center justify-center"
+                        :style="[
+                          'border-radius:8px',
+                          plan.type==='course' ? 'color:#2563eb;background:#eff6ff' :
+                          plan.type==='td'||plan.type==='tp' ? 'color:#059669;background:#ecfdf5' :
+                          plan.type==='study_session' ? 'color:var(--color-primary);background:color-mix(in srgb,var(--color-primary) 10%,transparent)' :
+                          plan.type==='exam'||plan.type==='task' ? 'color:#ea580c;background:#fff7ed' :
+                          'color:var(--color-text-muted);background:var(--color-border)'
+                        ].join(';')">
                         <UIcon v-if="plan.type === 'study_session'" name="i-lucide-sparkles" class="size-4" />
                         <UIcon v-else-if="plan.type === 'course'" name="i-lucide-book-open" class="size-4" />
                         <UIcon v-else-if="plan.type === 'td' || plan.type === 'tp'" name="i-lucide-calculator" class="size-4" />
@@ -317,8 +319,8 @@ onMounted(() => {
                         <UIcon v-else name="i-lucide-calendar" class="size-4" />
                       </div>
                       <div class="min-w-0 flex-1">
-                        <p class="font-bold text-[13px] truncate" :class="plan.type === 'study_session' ? 'text-indigo-700 dark:text-indigo-300' : 'text-slate-900 dark:text-white'">{{ plan.title }}</p>
-                        <p class="text-[11px] font-medium mt-0.5 truncate" :class="plan.type === 'study_session' ? 'text-indigo-500 dark:text-indigo-400' : 'text-slate-500'">{{ plan.location || (plan.type === 'study_session' ? 'AI Suggested' : plan.type.toUpperCase()) }}</p>
+                        <p class="font-bold text-[13px] truncate" :style="plan.type==='study_session' ? 'color:var(--color-primary)' : 'color:var(--color-text)'">{{ plan.title }}</p>
+                        <p class="text-[11px] font-medium mt-0.5 truncate" :style="plan.type==='study_session' ? 'color:var(--color-primary);opacity:0.7' : 'color:var(--color-text-muted)'">{{ plan.location || (plan.type === 'study_session' ? 'AI Suggested' : plan.type.toUpperCase()) }}</p>
                       </div>
                       <div v-if="plan.type === 'study_session'" class="size-6 rounded-full border border-indigo-200 flex items-center justify-center mr-1">
                         <UIcon name="i-lucide-plus" class="size-3.5 text-indigo-400" />
@@ -330,7 +332,7 @@ onMounted(() => {
             </div>
 
             <!-- Right: AI Suggestion -->
-            <div class="p-5 m-4 bg-[#f5f5fb] dark:bg-slate-900/40 rounded-[12px] border border-slate-200/60 dark:border-slate-700 flex flex-col">
+            <div class="p-5 m-4 flex flex-col" style="background:color-mix(in srgb,var(--color-primary) 5%,var(--color-surface));border-radius:12px;border:1px solid var(--color-border)">
               <div class="flex items-center gap-2 mb-2">
                 <UIcon name="i-lucide-sparkles" class="size-5" style="color:var(--color-primary)" />
                 <h2 class="text-[16px] font-bold" style="color:var(--color-primary)">AI Suggestion for You</h2>
@@ -389,21 +391,23 @@ onMounted(() => {
         </div>
 
         <!-- Recent Files -->
-        <div class="bg-white dark:bg-slate-800 rounded-[20px] p-6 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] border border-slate-100 dark:border-slate-700">
+        <div class="p-6" style="background:var(--color-surface);border-radius:16px;border:1px solid var(--color-border);box-shadow:var(--shadow-card)">
           <div class="flex items-center justify-between mb-5">
             <h3 class="font-bold text-[16px] text-slate-900 dark:text-white">Recent Files</h3>
             <NuxtLink to="/dashboard/files" class="text-[16px] font-bold text-indigo-600 hover:text-indigo-700">View all</NuxtLink>
           </div>
           <div class="grid gap-4 md:grid-cols-3">
             <div v-if="files.length === 0" class="text-sm text-slate-500 py-2">No recent files.</div>
-            <div v-for="file in files" :key="file._id" class="flex flex-col border border-slate-100 dark:border-slate-700 rounded-[10px] p-4 shadow-sm hover:shadow-md transition bg-white dark:bg-slate-800">
+            <div v-for="file in files" :key="file._id" class="flex flex-col p-4 transition" style="border-radius:10px;border:1px solid var(--color-border);background:var(--color-surface);box-shadow:var(--shadow-sm)">
               <div class="flex items-center gap-3 mb-4">
-                 <div class="flex size-[42px] flex-shrink-0 items-center justify-center rounded-[12px]" :class="{
-                   'bg-red-50 text-red-500': file.type === 'pdf',
-                   'bg-emerald-50 text-emerald-500': file.type === 'xlsx',
-                   'bg-blue-50 text-blue-500': file.type === 'docx',
-                   'bg-slate-100 text-slate-500': !['pdf', 'xlsx', 'docx'].includes(file.type)
-                 }">
+                 <div class="flex size-[42px] flex-shrink-0 items-center justify-center"
+                   :style="[
+                     'border-radius:12px',
+                     file.type==='pdf' ? 'background:#fef2f2;color:#ef4444' :
+                     file.type==='xlsx' ? 'background:#f0fdf4;color:#22c55e' :
+                     file.type==='docx' ? 'background:#eff6ff;color:#3b82f6' :
+                     'background:var(--color-border);color:var(--color-text-muted)'
+                   ].join(';')">
                    <UIcon :name="file.type === 'pdf' ? 'i-lucide-file-text' : 'i-lucide-file'" class="size-[20px]" />
                  </div>
                  <p class="text-[16px] font-bold text-slate-900 dark:text-white truncate flex-1">{{ file.originalName || file.fileName }}</p>
@@ -419,7 +423,7 @@ onMounted(() => {
       <div class="flex flex-col gap-6">
         
         <!-- AI Assistant -->
-        <div class="bg-white dark:bg-slate-800 rounded-[20px] p-6 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] border border-slate-100 dark:border-slate-700 flex flex-col">
+        <div class="p-6 flex flex-col" style="background:var(--color-surface);border-radius:16px;border:1px solid var(--color-border);box-shadow:var(--shadow-card)">
           <div class="flex items-center justify-between mb-5">
             <div class="flex items-center gap-2">
               <UIcon name="i-lucide-sparkles" class="size-5 text-indigo-500" />
@@ -436,36 +440,40 @@ onMounted(() => {
 
           <div class="flex-1 space-y-3">
             <template v-if="chatReplies.length === 0">
-              <div @click="sendChat('Summarize my course')" class="flex items-center gap-3 p-3 rounded-[8px] border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer transition shadow-sm">
-                 <div class="size-6 rounded-[6px] bg-indigo-50 flex items-center justify-center text-indigo-500">
+              <div @click="sendChat('Summarize my course')" class="flex items-center gap-3 p-3 cursor-pointer transition" style="border-radius:8px;border:1px solid var(--color-border);background:var(--color-surface);box-shadow:var(--shadow-sm)">
+                 <div class="size-6 flex items-center justify-center" style="border-radius:6px;background:color-mix(in srgb,var(--color-primary) 10%,transparent);color:var(--color-primary)">
                     <UIcon name="i-lucide-file-text" class="size-3.5" />
                  </div>
-                 <span class="text-[12px] font-bold text-slate-700 dark:text-slate-200">Summarize my course</span>
+                 <span class="text-[12px] font-bold" style="color:var(--color-text)">Summarize my course</span>
               </div>
               
-              <div @click="sendChat('Create a study plan')" class="flex items-center gap-3 p-3 rounded-[8px] border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer transition shadow-sm">
-                 <div class="size-6 rounded-[6px] bg-indigo-50 flex items-center justify-center text-indigo-500">
+              <div @click="sendChat('Create a study plan')" class="flex items-center gap-3 p-3 cursor-pointer transition" style="border-radius:8px;border:1px solid var(--color-border);background:var(--color-surface);box-shadow:var(--shadow-sm)">
+                 <div class="size-6 flex items-center justify-center" style="border-radius:6px;background:color-mix(in srgb,var(--color-primary) 10%,transparent);color:var(--color-primary)">
                     <UIcon name="i-lucide-calendar" class="size-3.5" />
                  </div>
-                 <span class="text-[12px] font-bold text-slate-700 dark:text-slate-200">Create a study plan</span>
+                 <span class="text-[12px] font-bold" style="color:var(--color-text)">Create a study plan</span>
               </div>
               
-              <div @click="sendChat('Generate exercises')" class="flex items-center gap-3 p-3 rounded-[8px] border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer transition shadow-sm">
-                 <div class="size-6 rounded-[6px] bg-indigo-50 flex items-center justify-center text-indigo-500">
+              <div @click="sendChat('Generate exercises')" class="flex items-center gap-3 p-3 cursor-pointer transition" style="border-radius:8px;border:1px solid var(--color-border);background:var(--color-surface);box-shadow:var(--shadow-sm)">
+                 <div class="size-6 flex items-center justify-center" style="border-radius:6px;background:color-mix(in srgb,var(--color-primary) 10%,transparent);color:var(--color-primary)">
                     <UIcon name="i-lucide-pencil" class="size-3.5" />
                  </div>
-                 <span class="text-[12px] font-bold text-slate-700 dark:text-slate-200">Generate exercises</span>
+                 <span class="text-[12px] font-bold" style="color:var(--color-text)">Generate exercises</span>
               </div>
               
-              <div @click="sendChat('What should I study today?')" class="flex items-center gap-3 p-3 rounded-[8px] border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer transition shadow-sm">
-                 <div class="size-6 rounded-[6px] bg-indigo-50 flex items-center justify-center text-indigo-500">
+              <div @click="sendChat('What should I study today?')" class="flex items-center gap-3 p-3 cursor-pointer transition" style="border-radius:8px;border:1px solid var(--color-border);background:var(--color-surface);box-shadow:var(--shadow-sm)">
+                 <div class="size-6 flex items-center justify-center" style="border-radius:6px;background:color-mix(in srgb,var(--color-primary) 10%,transparent);color:var(--color-primary)">
                     <UIcon name="i-lucide-message-circle" class="size-3.5" />
                  </div>
-                 <span class="text-[12px] font-bold text-slate-700 dark:text-slate-200">What should I study today?</span>
+                 <span class="text-[12px] font-bold" style="color:var(--color-text)">What should I study today?</span>
               </div>
             </template>
             <div v-else class="space-y-4 max-h-56 overflow-y-auto pr-2 scrollbar-thin">
-               <div v-for="(msg, i) in chatReplies" :key="i" class="text-[13px] rounded-[14px] p-3 shadow-sm font-medium" :class="msg.role === 'user' ? 'bg-[#4f46e5] text-white ml-6' : 'bg-white border border-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 mr-6'">
+               <div v-for="(msg, i) in chatReplies" :key="i" class="text-[13px] p-3 font-medium"
+                 :class="msg.role === 'user' ? 'ml-6' : 'mr-6'"
+                 :style="msg.role==='user'
+                   ? 'border-radius:14px;background:var(--color-primary);color:#fff;box-shadow:var(--shadow-sm)'
+                   : 'border-radius:14px;background:var(--color-surface);border:1px solid var(--color-border);color:var(--color-text);box-shadow:var(--shadow-sm)'">
                   {{ msg.content }}
                </div>
             </div>
@@ -478,9 +486,10 @@ onMounted(() => {
                  placeholder="Ask anything..."
                  @keyup.enter="sendChat()"
                  :disabled="isSendingChat"
-                 class="w-full h-[42px] bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-[16px] rounded-[12px] pl-4 pr-12 focus:outline-none focus:border-indigo-400 font-medium placeholder:text-slate-400"
+                 class="w-full h-[42px] pl-4 pr-12 text-[13px] font-medium focus:outline-none"
+                 style="border-radius:12px;border:1px solid var(--color-border);background:var(--color-bg);color:var(--color-text)"
                />
-               <button @click="sendChat()" class="absolute right-1.5 size-[30px] bg-[#4f46e5] hover:bg-indigo-600 transition rounded-[8px] flex items-center justify-center cursor-pointer disabled:opacity-50">
+               <button @click="sendChat()" class="absolute right-1.5 size-[30px] flex items-center justify-center cursor-pointer transition disabled:opacity-50" style="border-radius:8px;background:var(--color-primary)">
                  <UIcon name="i-lucide-send" class="size-[14px] text-white" />
                </button>
              </div>
@@ -498,7 +507,7 @@ onMounted(() => {
         </div>
 
         <!-- Upcoming -->
-        <div class="bg-white dark:bg-slate-800 rounded-[20px] p-6 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] border border-slate-100 dark:border-slate-700">
+        <div class="p-6" style="background:var(--color-surface);border-radius:16px;border:1px solid var(--color-border);box-shadow:var(--shadow-card)">
            <div class="flex items-center justify-between mb-6">
               <h3 class="font-bold text-[16px] text-slate-900 dark:text-white">Upcoming</h3>
               <NuxtLink to="/dashboard/schedule" class="text-[13px] font-bold text-indigo-600 hover:text-indigo-700">View all</NuxtLink>
@@ -506,8 +515,9 @@ onMounted(() => {
            
            <div class="space-y-5">
               <div v-if="upcomingItems.length === 0" class="text-[13px] text-slate-500 py-2 font-medium">No upcoming items.</div>
-              <div v-for="(item, idx) in upcomingItems" :key="item.id" class="flex gap-4 items-center" :class="idx !== upcomingItems.length - 1 ? 'pb-5 border-b border-slate-100 dark:border-slate-800' : ''">
-                 <div class="w-[42px] text-center flex-shrink-0 flex flex-col justify-center border-r border-slate-100 dark:border-slate-700 pr-4">
+              <div v-for="(item, idx) in upcomingItems" :key="item.id" class="flex gap-4 items-center"
+                 :style="idx !== upcomingItems.length - 1 ? 'padding-bottom:20px;border-bottom:1px solid var(--color-border)' : ''">
+                 <div class="w-[42px] text-center flex-shrink-0 flex flex-col justify-center pr-4" style="border-right:1px solid var(--color-border)">
                     <span class="text-[20px] font-bold text-slate-900 dark:text-white leading-none">{{ getDayMonth(item.date).day }}</span>
                     <span class="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">{{ getDayMonth(item.date).month }}</span>
                  </div>
@@ -515,7 +525,7 @@ onMounted(() => {
                     <p class="text-[16px] font-bold text-slate-900 dark:text-white truncate">{{ item.title }}</p>
                     <p class="text-[11px] font-medium text-slate-500 mt-1">{{ formatDateShort(item.date) }} • {{ formatTime(item.date.toISOString()) || '10:00 AM' }}</p>
                  </div>
-                 <span class="text-[10px] px-2.5 py-1 rounded-md font-bold whitespace-nowrap tracking-wide uppercase" :class="getDaysUntilClass(item.date)">
+                 <span class="text-[10px] px-2.5 py-1 font-bold whitespace-nowrap tracking-wide uppercase" :class="getDaysUntilClass(item.date)" style="border-radius:6px">
                     {{ getDaysUntil(item.date) }}
                  </span>
               </div>
@@ -523,7 +533,7 @@ onMounted(() => {
         </div>
 
         <!-- Recent Courses -->
-        <div class="bg-white dark:bg-slate-800 rounded-[20px] p-6 shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] border border-slate-100 dark:border-slate-700">
+        <div class="p-6" style="background:var(--color-surface);border-radius:16px;border:1px solid var(--color-border);box-shadow:var(--shadow-card)">
           <div class="flex items-center justify-between mb-6">
              <h3 class="font-bold text-[16px] text-slate-900 dark:text-white">Recent Courses</h3>
              <NuxtLink to="/dashboard/courses" class="text-[13px] font-bold text-indigo-600 hover:text-indigo-700">View all</NuxtLink>
@@ -531,7 +541,7 @@ onMounted(() => {
           <div class="space-y-4">
              <div v-if="courses.length === 0" class="text-[13px] text-slate-500 py-2 font-medium">No recent courses.</div>
              <div v-for="course in courses" :key="course._id" class="flex items-center gap-4">
-               <div class="flex size-[42px] flex-shrink-0 items-center justify-center rounded-[12px] bg-indigo-50 text-indigo-600 shadow-sm">
+               <div class="flex size-[42px] flex-shrink-0 items-center justify-center" style="border-radius:12px;background:color-mix(in srgb,var(--color-primary) 10%,transparent);color:var(--color-primary);box-shadow:var(--shadow-sm)">
                  <UIcon name="i-lucide-book-open" class="size-5" />
                </div>
                <div class="min-w-0 flex-1 relative pr-[38px]">
@@ -550,3 +560,73 @@ onMounted(() => {
     </div>
   </section>
 </template>
+
+<style scoped>
+/* Cards */
+.stat-card    { background: var(--color-surface); }
+.card-lg      { background: var(--color-surface); border-radius: 16px; border: 1px solid var(--color-border); box-shadow: var(--shadow-card); }
+.ai-panel     { background: color-mix(in srgb,var(--color-primary) 5%,var(--color-surface)); border-radius: 12px; border: 1px solid var(--color-border); }
+.file-item    { border-radius: 10px; border: 1px solid var(--color-border); background: var(--color-surface); box-shadow: var(--shadow-sm); }
+.plan-item         { border-radius: 10px; border: 1px solid var(--color-border); background: var(--color-surface); box-shadow: var(--shadow-sm); }
+.plan-item--study  { border-style: dashed; border-color: var(--color-primary) !important; background: color-mix(in srgb,var(--color-primary) 6%,transparent) !important; box-shadow: none; }
+.ai-plan-item { background: var(--color-surface); }
+
+/* Stat icons */
+.icon-base    { border-radius: 8px; }
+.icon-info    { background: color-mix(in srgb,var(--color-info) 10%,transparent);    color: var(--color-info); }
+.icon-warning { background: color-mix(in srgb,var(--color-warning) 12%,transparent); color: var(--color-warning); }
+.icon-primary { background: color-mix(in srgb,var(--color-primary) 10%,transparent); color: var(--color-primary); }
+.icon-success { background: color-mix(in srgb,var(--color-success) 10%,transparent); color: var(--color-success); }
+
+/* Plan type icons */
+.plan-icon          { border-radius: 8px; }
+.plan-icon--course  { color: #2563eb; background: #eff6ff; }
+.plan-icon--td      { color: #059669; background: #ecfdf5; }
+.plan-icon--study   { color: var(--color-primary); background: color-mix(in srgb,var(--color-primary) 10%,transparent); }
+.plan-icon--exam    { color: #ea580c; background: #fff7ed; }
+.plan-icon--default { color: var(--color-text-muted); background: var(--color-border); }
+
+/* File type icons */
+.file-icon        { border-radius: 12px; }
+.file-icon--pdf   { background: #fef2f2; color: #ef4444; }
+.file-icon--xlsx  { background: #f0fdf4; color: #22c55e; }
+.file-icon--docx  { background: #eff6ff; color: #3b82f6; }
+.file-icon--other { background: var(--color-border); color: var(--color-text-muted); }
+
+/* Text colors */
+.text-soft    { color: var(--color-text-soft); }
+.text-main    { color: var(--color-text); }
+.text-muted   { color: var(--color-text-muted); }
+.text-primary { color: var(--color-primary); }
+.text-success { color: var(--color-success); }
+.text-danger  { color: var(--color-danger); }
+
+/* Timeline */
+.timeline-line { background: var(--color-border); }
+.time-label    { color: var(--color-text-soft); background: var(--color-surface); }
+.dot-bg        { background: var(--color-surface); }
+.plan-title--study    { color: var(--color-primary); }
+.plan-title--normal   { color: var(--color-text); }
+.plan-sub--study      { color: var(--color-primary); opacity: 0.7; }
+.plan-sub--normal     { color: var(--color-text-muted); }
+
+/* Course icon */
+.course-icon { border-radius: 12px; background: color-mix(in srgb,var(--color-primary) 10%,transparent); color: var(--color-primary); box-shadow: var(--shadow-sm); }
+
+/* Chat suggestions */
+.chat-suggestion  { border-radius: 8px; border: 1px solid var(--color-border); background: var(--color-surface); box-shadow: var(--shadow-sm); }
+.suggestion-icon  { border-radius: 6px; background: color-mix(in srgb,var(--color-primary) 10%,transparent); color: var(--color-primary); }
+
+/* Chat messages */
+.msg-user { border-radius: 14px; background: var(--color-primary);  color: #fff; box-shadow: var(--shadow-sm); }
+.msg-ai   { border-radius: 14px; background: var(--color-surface); border: 1px solid var(--color-border); color: var(--color-text); box-shadow: var(--shadow-sm); }
+
+/* Chat input */
+.chat-input { border-radius: 12px; border: 1px solid var(--color-border); background: var(--color-bg); color: var(--color-text); }
+.send-btn   { border-radius: 8px; background: var(--color-primary); }
+
+/* Upcoming */
+.upcoming-item--bordered { padding-bottom: 20px; border-bottom: 1px solid var(--color-border); }
+.date-divider { border-right: 1px solid var(--color-border); }
+.badge { border-radius: 6px; }
+</style>

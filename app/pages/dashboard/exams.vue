@@ -1,17 +1,9 @@
 <script setup lang="ts">
-definePageMeta({
-  layout: 'dashboard'
-})
+definePageMeta({ layout: 'dashboard' })
+// Exams are now part of the unified Tasks & Exams page
 </script>
-
 <template>
-  <section>
-    <h1 class="text-3xl font-bold text-slate-900">
-      Exams
-    </h1>
-
-    <p class="mt-2 text-slate-500">
-      Stay on top of your exams and revision plans.
-    </p>
-  </section>
+  <div>
+    <NuxtLink to="/dashboard/tasks" replace />
+  </div>
 </template>

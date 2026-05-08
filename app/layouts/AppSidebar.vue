@@ -14,8 +14,7 @@ const navItems = [
   { label: 'Schedule', icon: 'i-lucide-calendar-days', to: '/dashboard/schedule' },
   { label: 'Courses', icon: 'i-lucide-book-open', to: '/dashboard/courses' },
   { label: 'Files', icon: 'i-lucide-file-text', to: '/dashboard/files' },
-  { label: 'Exams', icon: 'i-lucide-clipboard-check', to: '/dashboard/exams' },
-  { label: 'Tasks', icon: 'i-lucide-check-square', to: '/dashboard/tasks' },
+  { label: 'Tasks & Exams', icon: 'i-lucide-clipboard-check', to: '/dashboard/tasks' },
   { label: 'AI Assistant', icon: 'i-lucide-sparkles', to: '/dashboard/assistant' },
   { label: 'Analytics', icon: 'i-lucide-chart-column', to: '/dashboard/analytics' }
 ]
