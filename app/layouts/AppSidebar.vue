@@ -45,7 +45,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <aside class="fixed left-0 top-0 z-40 h-screen w-[280px] border-r border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-700">
+  <aside class="fixed left-0 top-0 z-40 h-screen w-[280px] border-r border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-y-auto sidebar-scroll">
     <div class="px-4 py-8 flex flex-col min-h-full">
       <NuxtLink to="/dashboard" class="mb-10 flex flex-shrink-0 items-center gap-3">
         <div class="flex size-[38px] items-center justify-center rounded-[12px] bg-[#4338ca] text-white shadow-sm shadow-indigo-200 dark:shadow-none">
@@ -97,10 +97,10 @@ onMounted(async () => {
             </svg>
           </div>
           
-          <p class="text-[13px] font-semibold relative z-10 text-white tracking-wide">
+          <p class="text-[13px] font-semibold relative z-10 !text-white tracking-wide">
             Upgrade your plan
           </p>
-          <p class="mt-2 text-[11px] leading-[1.6] text-white/80 pr-12 relative z-10 font-medium">
+          <p class="mt-2 text-[11px] leading-[1.6] !text-white opacity-80 pr-12 relative z-10 font-medium">
             Unlock unlimited AI<br>
             features and more<br>
             productivity.
