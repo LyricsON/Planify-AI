@@ -14,8 +14,7 @@ const navItems = [
   { label: 'Schedule', icon: 'i-lucide-calendar-days', to: '/dashboard/schedule' },
   { label: 'Courses', icon: 'i-lucide-book-open', to: '/dashboard/courses' },
   { label: 'Files', icon: 'i-lucide-file-text', to: '/dashboard/files' },
-  { label: 'Exams', icon: 'i-lucide-clipboard-check', to: '/dashboard/exams' },
-  { label: 'Tasks', icon: 'i-lucide-check-square', to: '/dashboard/tasks' },
+  { label: 'Tasks & Exams', icon: 'i-lucide-clipboard-check', to: '/dashboard/tasks' },
   { label: 'AI Assistant', icon: 'i-lucide-sparkles', to: '/dashboard/assistant' },
   { label: 'Analytics', icon: 'i-lucide-chart-column', to: '/dashboard/analytics' }
 ]
@@ -45,13 +44,13 @@ onMounted(async () => {
 </script>
 
 <template>
-  <aside class="fixed left-0 top-0 z-40 h-screen w-[280px] border-r border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-y-auto sidebar-scroll">
+  <aside class="fixed left-0 top-0 z-40 h-screen w-[260px] border-r border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-y-auto sidebar-scroll">
     <div class="px-4 py-8 flex flex-col min-h-full">
       <NuxtLink to="/dashboard" class="mb-10 flex flex-shrink-0 items-center gap-3">
         <div class="flex size-[38px] items-center justify-center rounded-[12px] bg-[#4338ca] text-white shadow-sm shadow-indigo-200 dark:shadow-none">
           <UIcon name="i-lucide-box" class="size-5 fill-white/20" />
         </div>
-        <span class="text-[22px] font-bold text-[#312e81] dark:text-indigo-400 tracking-tight">
+        <span class="text-[24px] font-bold text-[#312e81] dark:text-indigo-400 tracking-tight">
           Planify AI
         </span>
       </NuxtLink>
@@ -61,7 +60,7 @@ onMounted(async () => {
           v-for="item in navItems"
           :key="item.to"
           :to="item.to"
-          class="relative flex items-center gap-2 rounded-[12px] px-2 py-3 text-[14px] font-semibold transition text-slate-800"
+          class="relative flex items-center gap-2 rounded-[12px] px-2 py-3 text-[13px] font-semibold transition text-slate-800"
           :class="isRouteActive(item.to) ? 'bg-[#f5f4fd] text-[#534bfa] dark:bg-indigo-900/40 dark:text-indigo-400' : 'text-slate-800 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-[#534bfa] dark:hover:text-slate-200'"
         >
           <div v-if="isRouteActive(item.to)" class="absolute -left-6 top-1.5 bottom-1.5 w-[5px] rounded-r-[6px] bg-[#534bfa] dark:bg-indigo-400"></div>
@@ -74,7 +73,7 @@ onMounted(async () => {
         <!-- Upgrade Plan Card -->
         <div class="rounded-[14px] bg-gradient-to-br from-[#4f46e5] via-[#6366f1] to-[#7c3aed] p-5 text-white relative overflow-hidden flex flex-col items-start shadow-sm">
           <!-- Decorative Stars -->
-          <div class="absolute right-3 top-1/2 -translate-y-1/2 flex items-center justify-center opacity-90 pointer-events-none">
+          <div class="absolute right-6 top-[35%] -translate-y-1/2 flex items-center justify-center opacity-90 pointer-events-none">
             <!-- Small Blue Star -->
             <svg class="absolute -left-3 top-5 w-[16px] h-[16px]" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <defs>
@@ -97,16 +96,14 @@ onMounted(async () => {
             </svg>
           </div>
           
-          <p class="text-[13px] font-semibold relative z-10 !text-white tracking-wide">
+          <p class="plan-card text-[13px] font-semibold relative z-10 !text-white tracking-wide">
             Upgrade your plan
           </p>
-          <p class="mt-2 text-[11px] leading-[1.6] !text-white opacity-80 pr-12 relative z-10 font-medium">
-            Unlock unlimited AI<br>
-            features and more<br>
-            productivity.
+          <p class="plan-card text-[11px] leading-[1.6] !text-white opacity-80 pr-12 relative z-10 font-medium">
+            Unlock unlimited AI features and more productivity.
           </p>
           <button
-            class="mt-4 text-[12px] text-[#534bfa] font-bold bg-white hover:bg-slate-50 rounded-[8px] px-4 py-1.5 relative z-10 transition-colors"
+            class="mt-2 text-[12px] text-[#534bfa] font-bold bg-white hover:bg-slate-50 rounded-[8px] px-4 py-1.5 relative z-10 transition-colors"
           >
             Upgrade Now
           </button>
@@ -142,7 +139,7 @@ onMounted(async () => {
           <UAvatar v-else size="sm" icon="i-lucide-user" class="rounded-full size-[36px]" />
 
           <div class="min-w-0 flex-1 pl-1">
-            <p class="truncate text-[14px] font-bold text-[#312e81] dark:text-white leading-tight">
+            <p class="truncate text-[13px] font-bold text-[#312e81] dark:text-white leading-tight">
               {{ user ? user.name : 'Loading...' }}
             </p>
             <p class="text-[11px] font-bold text-slate-500 dark:text-slate-400 capitalize truncate mt-0.5">
@@ -158,3 +155,8 @@ onMounted(async () => {
     </div>
   </aside>
 </template>
+<style scoped>
+  .plan-card{
+  margin-bottom: 6px;
+  }
+</style>
