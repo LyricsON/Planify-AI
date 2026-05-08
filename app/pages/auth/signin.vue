@@ -5,6 +5,9 @@ definePageMeta({
   layout: 'auth'
 })
 
+const { post } = useApi()
+const { saveAuthToken, getAuthRedirect } = useAuth()
+
 const form = reactive({
   email: '',
   password: '',
@@ -13,14 +16,32 @@ const form = reactive({
 
 const showPassword = ref(false)
 const isLoading = ref(false)
+const errorMessage = ref('')
 
 const onSubmit = async () => {
-  if (!form.email || !form.password) return
+  if (!form.email || !form.password || isLoading.value) return
 
+  errorMessage.value = ''
   isLoading.value = true
-  await new Promise(resolve => setTimeout(resolve, 500))
-  console.log('Sign in payload:', form)
-  isLoading.value = false
+
+  try {
+    const response = await post('/auth/login', {
+      email: form.email.trim().toLowerCase(),
+      password: form.password
+    })
+
+    if (!response.success || !response.token) {
+      errorMessage.value = response.message || 'Unable to sign in. Please try again.'
+      return
+    }
+
+    saveAuthToken(response.token)
+    await navigateTo(getAuthRedirect())
+  } catch {
+    errorMessage.value = 'Unable to reach the server. Check that the backend is running and try again.'
+  } finally {
+    isLoading.value = false
+  }
 }
 </script>
 
@@ -32,6 +53,11 @@ const onSubmit = async () => {
     align="center"
   >
     <form @submit.prevent="onSubmit" class="signin-form">
+      <div v-if="errorMessage" class="signin-alert signin-alert-error">
+        <UIcon name="i-lucide-circle-alert" class="signin-alert-icon" />
+        <span>{{ errorMessage }}</span>
+      </div>
+
       <label class="signin-field">
         <span class="signin-label">Email address</span>
         <div class="signin-input">
@@ -103,9 +129,10 @@ const onSubmit = async () => {
       <button
         type="button"
         class="signin-google"
+        disabled
       >
         <UIcon name="i-simple-icons-google" class="signin-google-icon" />
-        <span>Continue with Google</span>
+        <span>Google sign-in coming soon</span>
       </button>
 
       <p class="signin-footer">
@@ -127,6 +154,29 @@ const onSubmit = async () => {
 
 .signin-field {
   display: block;
+}
+
+.signin-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.signin-alert-error {
+  border: 1px solid color-mix(in srgb, var(--color-danger) 24%, transparent);
+  background: color-mix(in srgb, var(--color-danger) 10%, var(--color-card-bg));
+  color: color-mix(in srgb, var(--color-danger) 78%, var(--color-text));
+}
+
+.signin-alert-icon {
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  flex-shrink: 0;
 }
 
 .signin-label {
@@ -270,6 +320,11 @@ const onSubmit = async () => {
 
 .signin-google:hover {
   background: var(--color-bg-soft);
+}
+
+.signin-google:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
 }
 
 .signin-google-icon {
