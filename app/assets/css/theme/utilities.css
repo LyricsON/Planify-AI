@@ -243,3 +243,12 @@
 .focus-ring:focus-visible {
   box-shadow: 0 0 0 2px var(--color-bg), 0 0 0 4px var(--color-primary);
 }
+
+/* Invisible Scrollbar */
+.sidebar-scroll {
+  scrollbar-width: none;        /* Firefox */
+  -ms-overflow-style: none;     /* IE / Edge */
+}
+.sidebar-scroll::-webkit-scrollbar {
+  display: none;                /* Chrome / Safari / Opera */
+}

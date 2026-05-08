@@ -45,7 +45,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <aside class="fixed left-0 top-0 z-40 h-screen w-[280px] border-r border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-700">
+  <aside class="fixed left-0 top-0 z-40 h-screen w-[280px] border-r border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-y-auto sidebar-scroll">
     <div class="px-4 py-8 flex flex-col min-h-full">
       <NuxtLink to="/dashboard" class="mb-10 flex flex-shrink-0 items-center gap-3">
         <div class="flex size-[38px] items-center justify-center rounded-[12px] bg-[#4338ca] text-white shadow-sm shadow-indigo-200 dark:shadow-none">
