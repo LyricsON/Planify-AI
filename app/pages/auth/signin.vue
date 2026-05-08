@@ -52,16 +52,28 @@ const onSubmit = async () => {
     subtitle="Sign in to continue to Planify AI"
     align="center"
   >
-    <form @submit.prevent="onSubmit" class="signin-form">
-      <div v-if="errorMessage" class="signin-alert signin-alert-error">
-        <UIcon name="i-lucide-circle-alert" class="signin-alert-icon" />
+    <form
+      class="signin-form"
+      @submit.prevent="onSubmit"
+    >
+      <div
+        v-if="errorMessage"
+        class="signin-alert signin-alert-error"
+      >
+        <UIcon
+          name="i-lucide-circle-alert"
+          class="signin-alert-icon"
+        />
         <span>{{ errorMessage }}</span>
       </div>
 
       <label class="signin-field">
         <span class="signin-label">Email address</span>
         <div class="signin-input">
-          <UIcon name="i-lucide-mail" class="signin-input-icon" />
+          <UIcon
+            name="i-lucide-mail"
+            class="signin-input-icon"
+          />
           <input
             v-model="form.email"
             type="email"
@@ -75,7 +87,10 @@ const onSubmit = async () => {
       <label class="signin-field">
         <span class="signin-label">Password</span>
         <div class="signin-input">
-          <UIcon name="i-lucide-lock" class="signin-input-icon" />
+          <UIcon
+            name="i-lucide-lock"
+            class="signin-input-icon"
+          />
           <input
             v-model="form.password"
             :type="showPassword ? 'text' : 'password'"
@@ -88,7 +103,10 @@ const onSubmit = async () => {
             class="signin-icon-button"
             @click="showPassword = !showPassword"
           >
-            <UIcon :name="showPassword ? 'i-lucide-eye-off' : 'i-lucide-eye'" class="signin-input-icon" />
+            <UIcon
+              :name="showPassword ? 'i-lucide-eye-off' : 'i-lucide-eye'"
+              class="signin-input-icon"
+            />
           </button>
         </div>
       </label>
@@ -117,7 +135,10 @@ const onSubmit = async () => {
         :disabled="isLoading"
       >
         <span>{{ isLoading ? 'Signing in...' : 'Sign in' }}</span>
-        <UIcon name="i-lucide-arrow-right" class="signin-submit-icon" />
+        <UIcon
+          name="i-lucide-arrow-right"
+          class="signin-submit-icon"
+        />
       </button>
 
       <div class="signin-divider">
@@ -131,13 +152,19 @@ const onSubmit = async () => {
         class="signin-google"
         disabled
       >
-        <UIcon name="i-simple-icons-google" class="signin-google-icon" />
+        <UIcon
+          name="i-simple-icons-google"
+          class="signin-google-icon"
+        />
         <span>Google sign-in coming soon</span>
       </button>
 
       <p class="signin-footer">
         Don't have an account?
-        <NuxtLink to="/auth/signup" class="signin-link">
+        <NuxtLink
+          to="/auth/signup"
+          class="signin-link"
+        >
           Sign up
         </NuxtLink>
       </p>

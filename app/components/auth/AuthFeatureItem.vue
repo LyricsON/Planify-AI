@@ -17,7 +17,10 @@ const iconBoxClass = computed(() => {
 <template>
   <div class="flex items-start gap-4">
     <div :class="iconBoxClass">
-      <UIcon :name="icon" class="w-5 h-5" />
+      <UIcon
+        :name="icon"
+        class="w-5 h-5"
+      />
     </div>
     <div>
       <h3 class="mb-1 text-[0.98rem] font-semibold text-[var(--color-text)]">

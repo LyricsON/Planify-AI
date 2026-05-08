@@ -26,7 +26,10 @@ defineProps<{
       >
         <div class="mb-7 flex items-center justify-center gap-3 lg:hidden">
           <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--color-primary)] text-white shadow-sm">
-            <UIcon name="i-lucide-sparkles" class="h-5 w-5" />
+            <UIcon
+              name="i-lucide-sparkles"
+              class="h-5 w-5"
+            />
           </div>
           <span class="text-2xl font-bold tracking-tight text-[var(--color-text)]">Planify AI</span>
         </div>

@@ -1,101 +1,262 @@
 <script setup lang="ts">
+import { storeToRefs } from 'pinia'
+
 definePageMeta({ layout: 'dashboard' })
-const { get } = useApi()
 
-const plans = [
-  { id:'free', name:'Free', price:0, period:'forever', features:['5 AI summaries/month','10 flashcard sets','Basic schedule','1 GB storage'], cta:'Current Plan', current:true },
-  { id:'student', name:'Student', price:9, period:'/month', features:['Unlimited AI summaries','Unlimited flashcards','Smart schedule with AI','10 GB storage','Priority support'], cta:'Upgrade', current:false, popular:true },
-  { id:'pro', name:'Pro', price:19, period:'/month', features:['Everything in Student','Advanced analytics','Custom AI tutor','50 GB storage','API access'], cta:'Upgrade', current:false }
-]
+const billingStore = useBillingStore()
+const { subscription, tokenBalance, tokenUsage, tokenPacks, paymentMethods, paymentHistory, pricingPlans, loading, error, usingMockData } = storeToRefs(billingStore)
+const feedback = ref<{ tone: 'success' | 'warning' | 'info', text: string } | null>(null)
 
-const tokens = ref(250)
-const tokenPacks = [
-  { amount:500, price:4.99 }, { amount:1000, price:8.99 }, { amount:2500, price:19.99 }
-]
+onMounted(async () => {
+  await billingStore.fetchBilling()
+})
 
-const billing = ref<any[]>([])
-async function load() {
-  const r = await get<any>('/auth/billing-history')
-  if (r.success) billing.value = Array.isArray(r.data)?r.data:r.data?.data||[]
+async function buyPack(id: string) {
+  const ok = await billingStore.buyTokenPack(id)
+
+  feedback.value = {
+    tone: ok ? 'success' : 'warning',
+    text: ok ? 'Your token balance has been updated.' : (error.value || 'Backend unavailable. The local balance was updated for demo flow.')
+  }
 }
-onMounted(load)
+
+async function addPaymentMethod() {
+  await billingStore.addPaymentMethod({
+    brand: 'Visa',
+    label: 'Visa ending in 3030',
+    expiry: '12/28'
+  })
+
+  feedback.value = {
+    tone: 'info',
+    text: 'A demo payment method was added to the list.'
+  }
+}
+
+async function removePaymentMethod(id: string) {
+  await billingStore.removePaymentMethod(id)
+  feedback.value = {
+    tone: 'info',
+    text: 'The selected payment method was removed.'
+  }
+}
 </script>
 
 <template>
-  <section class="max-w-[1000px] mx-auto pb-10">
-    <div class="mb-6">
-      <h1 class="text-[24px] font-bold" style="color:var(--color-text)">Billing & Subscription</h1>
-      <p class="text-[13px] mt-0.5" style="color:var(--color-text-muted)">Manage your plan, tokens and billing history.</p>
+  <section class="mx-auto max-w-[1440px] space-y-6 pb-10">
+    <header class="space-y-2">
+      <h1 class="text-4xl font-semibold tracking-tight text-[var(--color-text)]">
+        Billing
+      </h1>
+      <p class="text-base text-muted">
+        Manage your subscription, payment methods, and billing history.
+      </p>
+    </header>
+
+    <SettingsTabs />
+
+    <div
+      v-if="usingMockData"
+      class="glass-card flex items-center gap-3 rounded-2xl px-4 py-3 text-sm text-[var(--color-text-soft)]"
+    >
+      <UIcon
+        name="i-lucide-wallet-cards"
+        class="size-4 text-[var(--color-primary)]"
+      />
+      <span>{{ error || 'Backend unavailable. Showing mock billing data.' }}</span>
     </div>
 
-    <div class="flex flex-col gap-6">
-      <!-- Plans -->
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div v-for="p in plans" :key="p.id" class="relative p-5 flex flex-col" :style="p.popular?'border-radius:16px;background:color-mix(in srgb,var(--color-primary) 5%,var(--color-surface));border:2px solid var(--color-primary);box-shadow:var(--shadow-card)':'border-radius:16px;background:var(--color-surface);border:1px solid var(--color-border);box-shadow:var(--shadow-card)'">
-          <div v-if="p.popular" class="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 text-[11px] font-bold text-white" style="border-radius:99px;background:var(--color-primary)">Most Popular</div>
-          <h3 class="text-[16px] font-bold mb-1" style="color:var(--color-text)">{{ p.name }}</h3>
-          <div class="flex items-baseline gap-1 mb-4">
-            <span class="text-[28px] font-bold" style="color:var(--color-text)">${{ p.price }}</span>
-            <span class="text-[13px]" style="color:var(--color-text-muted)">{{ p.period }}</span>
-          </div>
-          <ul class="space-y-2 mb-6 flex-1">
-            <li v-for="f in p.features" :key="f" class="flex items-center gap-2 text-[13px]" style="color:var(--color-text-soft)">
-              <UIcon name="i-lucide-check" class="size-3.5 flex-shrink-0" style="color:var(--color-success)" />{{ f }}
-            </li>
-          </ul>
-          <button class="w-full py-2.5 text-[13px] font-bold transition" :style="p.current?'border-radius:10px;background:var(--color-border);color:var(--color-text-muted);cursor:default':p.popular?'border-radius:10px;background:var(--color-primary);color:#fff':'border-radius:10px;border:1.5px solid var(--color-primary);color:var(--color-primary)'">
-            {{ p.cta }}
-          </button>
+    <div
+      v-if="feedback"
+      class="rounded-2xl px-4 py-3 text-sm font-medium"
+      :class="feedback.tone === 'success' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300' : feedback.tone === 'warning' ? 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300' : 'bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300'"
+    >
+      {{ feedback.text }}
+    </div>
+
+    <div
+      v-if="loading"
+      class="grid gap-6 xl:grid-cols-[1fr_340px]"
+    >
+      <div class="space-y-6">
+        <div class="grid gap-6 lg:grid-cols-[1.2fr_.8fr]">
+          <div
+            v-for="item in 2"
+            :key="item"
+            class="h-80 animate-pulse rounded-[var(--radius-2xl)] bg-[var(--color-bg-soft)]"
+          />
         </div>
+        <div class="h-72 animate-pulse rounded-[var(--radius-2xl)] bg-[var(--color-bg-soft)]" />
+        <div class="h-80 animate-pulse rounded-[var(--radius-2xl)] bg-[var(--color-bg-soft)]" />
+      </div>
+      <div class="space-y-6">
+        <div
+          v-for="item in 3"
+          :key="item"
+          class="h-72 animate-pulse rounded-[var(--radius-2xl)] bg-[var(--color-bg-soft)]"
+        />
+      </div>
+    </div>
+
+    <div
+      v-else-if="subscription && tokenBalance"
+      class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]"
+    >
+      <div class="space-y-6">
+        <div class="grid gap-6 lg:grid-cols-[1.2fr_.8fr]">
+          <SubscriptionCard :subscription="subscription" />
+          <TokenBalanceCard
+            :token-balance="tokenBalance"
+            @buy="buyPack(tokenPacks[0]?.id || 'starter')"
+          />
+        </div>
+
+        <section class="section-card">
+          <div class="mb-4 flex items-center justify-between gap-3">
+            <div>
+              <h3 class="text-xl font-semibold text-[var(--color-text)]">
+                Buy Token Packs
+              </h3>
+              <p class="mt-1 text-sm text-muted">
+                Need more tokens? Choose a pack that fits your needs.
+              </p>
+            </div>
+          </div>
+
+          <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <TokenPackCard
+              v-for="pack in tokenPacks"
+              :key="pack.id"
+              :pack="pack"
+              @buy="buyPack"
+            />
+          </div>
+        </section>
+
+        <PaymentMethodsCard
+          :methods="paymentMethods"
+          @add="addPaymentMethod"
+          @remove="removePaymentMethod"
+        />
+        <PaymentHistoryCard :history="paymentHistory" />
       </div>
 
-      <!-- Tokens -->
-      <div class="p-6" style="border-radius:16px;background:var(--color-surface);border:1px solid var(--color-border);box-shadow:var(--shadow-card)">
-        <div class="flex items-center justify-between mb-5">
-          <div>
-            <h2 class="text-[15px] font-bold" style="color:var(--color-text)">AI Tokens</h2>
-            <p class="text-[13px] mt-0.5" style="color:var(--color-text-muted)">Used for AI summaries, flashcards and assistant chats.</p>
+      <div class="space-y-6">
+        <section class="section-card">
+          <div class="mb-4 flex items-center justify-between gap-3">
+            <h3 class="text-xl font-semibold text-[var(--color-text)]">
+              Usage Summary
+            </h3>
+            <button
+              type="button"
+              class="rounded-xl border border-[var(--color-border)] px-3 py-2 text-sm font-semibold text-[var(--color-text-soft)]"
+            >
+              This Month
+            </button>
           </div>
-          <div class="text-center px-5 py-2" style="border-radius:10px;background:color-mix(in srgb,var(--color-primary) 10%,transparent)">
-            <p class="text-[26px] font-bold" style="color:var(--color-primary)">{{ tokens }}</p>
-            <p class="text-[11px] font-semibold" style="color:var(--color-primary)">tokens left</p>
-          </div>
-        </div>
-        <div class="grid grid-cols-3 gap-3">
-          <button v-for="t in tokenPacks" :key="t.amount" class="p-4 flex flex-col items-center gap-1 transition" style="border-radius:12px;border:1px solid var(--color-border)">
-            <p class="text-[18px] font-bold" style="color:var(--color-text)">{{ t.amount }}</p>
-            <p class="text-[11px]" style="color:var(--color-text-muted)">tokens</p>
-            <p class="text-[13px] font-bold mt-1" style="color:var(--color-primary)">${{ t.price }}</p>
-          </button>
-        </div>
-        <button class="mt-4 w-full py-2.5 text-[13px] font-bold text-white transition" style="border-radius:10px;background:var(--color-primary)">Buy Tokens →</button>
-      </div>
 
-      <!-- Billing history -->
-      <div class="p-6" style="border-radius:16px;background:var(--color-surface);border:1px solid var(--color-border);box-shadow:var(--shadow-card)">
-        <h2 class="text-[15px] font-bold mb-4" style="color:var(--color-text)">Billing History</h2>
-        <div v-if="!billing.length" class="flex flex-col items-center py-10" style="color:var(--color-text-muted)">
-          <UIcon name="i-lucide-receipt" class="size-10 opacity-30 mb-3" />
-          <p class="text-[14px]">No billing history yet.</p>
-        </div>
-        <table v-else class="w-full text-[13px]">
-          <thead>
-            <tr class="border-b" style="border-color:var(--color-border)">
-              <th class="text-left py-2 font-bold" style="color:var(--color-text-muted)">Date</th>
-              <th class="text-left py-2 font-bold" style="color:var(--color-text-muted)">Description</th>
-              <th class="text-right py-2 font-bold" style="color:var(--color-text-muted)">Amount</th>
-              <th class="text-right py-2 font-bold" style="color:var(--color-text-muted)">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="b in billing" :key="b._id" class="border-b" style="border-color:var(--color-border)">
-              <td class="py-3" style="color:var(--color-text-muted)">{{ new Date(b.date).toLocaleDateString('en-GB') }}</td>
-              <td class="py-3" style="color:var(--color-text)">{{ b.description }}</td>
-              <td class="py-3 text-right font-bold" style="color:var(--color-text)">${{ b.amount }}</td>
-              <td class="py-3 text-right"><span class="text-[11px] font-bold px-2 py-0.5" style="border-radius:5px;background:#f0fdf4;color:#22c55e">{{ b.status }}</span></td>
-            </tr>
-          </tbody>
-        </table>
+          <div class="space-y-5">
+            <div
+              v-for="item in tokenUsage"
+              :key="item.id"
+            >
+              <div class="mb-2 flex items-center justify-between gap-3">
+                <span class="text-sm font-medium text-[var(--color-text)]">{{ item.label }}</span>
+                <span class="text-sm text-[var(--color-text-soft)]">{{ item.tokens.toLocaleString() }} tokens {{ item.percentage }}%</span>
+              </div>
+              <div class="h-2 rounded-full bg-[var(--color-bg-soft)]">
+                <div
+                  class="h-full rounded-full bg-[var(--color-primary)]"
+                  :style="{ width: `${item.percentage}%` }"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-6 border-t border-[var(--color-border)] pt-4">
+            <p class="text-sm text-muted">
+              Total Used
+            </p>
+            <p class="mt-2 text-lg font-semibold text-[var(--color-text)]">
+              {{ tokenBalance.used.toLocaleString() }} / {{ tokenBalance.limit.toLocaleString() }} tokens
+            </p>
+          </div>
+
+          <div class="mt-6 rounded-2xl bg-[var(--color-primary-soft)] p-4 text-sm text-[var(--color-text-soft)]">
+            Need more tokens? Upgrade your plan or buy token packs to keep going.
+          </div>
+        </section>
+
+        <section class="section-card">
+          <h3 class="mb-4 text-xl font-semibold text-[var(--color-text)]">
+            Upgrade or Downgrade
+          </h3>
+          <p class="mb-4 text-sm text-muted">
+            Choose the plan that works best for you.
+          </p>
+          <div class="rounded-2xl border border-[var(--color-border)] p-4">
+            <div class="mb-3 flex items-center justify-between gap-3">
+              <p class="text-lg font-semibold text-[var(--color-text)]">
+                {{ subscription.name }}
+              </p>
+              <span class="status-badge status-info">Current</span>
+            </div>
+            <ul class="space-y-2 text-sm text-[var(--color-text-soft)]">
+              <li>4,000 tokens per month</li>
+              <li>AI Assistant (Answers & Explanations)</li>
+              <li>Document Analysis</li>
+              <li>Practice Exams</li>
+              <li>Flashcards & Summaries</li>
+              <li>Email Support</li>
+            </ul>
+            <button
+              type="button"
+              class="mt-5 w-full rounded-xl border border-[var(--color-primary)] px-4 py-3 text-sm font-semibold text-[var(--color-primary)]"
+            >
+              Compare Plans
+            </button>
+          </div>
+        </section>
+
+        <section class="section-card">
+          <h3 class="mb-4 text-xl font-semibold text-[var(--color-text)]">
+            Plans & Pricing
+          </h3>
+          <div class="space-y-4">
+            <div
+              v-for="plan in pricingPlans"
+              :key="plan.id"
+              class="rounded-2xl border border-[var(--color-border)] p-4"
+            >
+              <div class="mb-3 flex items-center justify-between gap-3">
+                <p class="text-lg font-semibold text-[var(--color-text)]">
+                  {{ plan.name }}
+                </p>
+                <span
+                  v-if="plan.badge"
+                  class="status-badge status-info"
+                >{{ plan.badge }}</span>
+              </div>
+              <p class="text-2xl font-semibold text-[var(--color-text)]">
+                {{ plan.priceLabel }}
+              </p>
+              <ul class="mt-4 space-y-2 text-sm text-[var(--color-text-soft)]">
+                <li
+                  v-for="feature in plan.features"
+                  :key="feature"
+                >
+                  {{ feature }}
+                </li>
+              </ul>
+              <button
+                type="button"
+                class="mt-5 w-full rounded-xl border border-[var(--color-primary)] px-4 py-3 text-sm font-semibold text-[var(--color-primary)]"
+              >
+                {{ plan.cta }}
+              </button>
+            </div>
+          </div>
+        </section>
       </div>
     </div>
   </section>

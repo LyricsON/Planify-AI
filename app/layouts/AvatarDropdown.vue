@@ -34,7 +34,7 @@ const items = [
       color: 'error'
     }
   ]
-]
+] as any
 </script>
 
 <template>
@@ -46,7 +46,10 @@ const items = [
         size="sm"
       />
 
-      <UIcon name="i-lucide-chevron-down" class="size-4 text-slate-500" />
+      <UIcon
+        name="i-lucide-chevron-down"
+        class="size-4 text-slate-500"
+      />
     </button>
   </UDropdownMenu>
 </template>

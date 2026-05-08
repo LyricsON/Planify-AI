@@ -11,17 +11,17 @@ export default defineNuxtConfig({
     enabled: true
   },
 
+  css: [
+    '~/assets/css/main.css',
+    'primeicons/primeicons.css'
+  ],
+
   colorMode: {
     preference: 'light',
     fallback: 'light',
     classSuffix: '',
     storageKey: 'planify-theme-force-light'
   },
-
-  css: [
-    '~/assets/css/main.css',
-    'primeicons/primeicons.css'
-  ],
 
   runtimeConfig: {
     public: {

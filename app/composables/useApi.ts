@@ -1,78 +1,111 @@
-// app/composables/useApi.ts
-// Reusable authenticated API composable for Planify AI
-
 export interface ApiResponse<T = unknown> {
   success: boolean
   data?: T
+  message?: string
+  statusCode?: number
   count?: number
   total?: number
   page?: number
   pages?: number
-  message?: string
   token?: string
 }
 
 const AUTH_TOKEN_KEY = 'planify_token'
 
 export function getToken(): string | null {
-  if (import.meta.client) {
-    return localStorage.getItem(AUTH_TOKEN_KEY)
+  if (!import.meta.client) {
+    return null
   }
-  return null
+
+  return localStorage.getItem('accessToken') || localStorage.getItem(AUTH_TOKEN_KEY)
 }
 
 export function setToken(token: string) {
   if (import.meta.client) {
     localStorage.setItem(AUTH_TOKEN_KEY, token)
+    localStorage.setItem('accessToken', token)
   }
 }
 
 export function clearToken() {
   if (import.meta.client) {
     localStorage.removeItem(AUTH_TOKEN_KEY)
+    localStorage.removeItem('accessToken')
+  }
+}
+
+function normalizeResponse<T>(payload: unknown): ApiResponse<T> {
+  if (payload && typeof payload === 'object' && 'success' in payload) {
+    return payload as ApiResponse<T>
+  }
+
+  return {
+    success: true,
+    data: payload as T
   }
 }
 
 export function useApi() {
   const config = useRuntimeConfig()
-  const baseUrl = config.public.apiBase as string
+  const baseURL = config.public.apiBase as string
 
-  async function get<T = unknown>(path: string, params?: Record<string, string | number>): Promise<ApiResponse<T>> {
-    const token = getToken()
-    const url = new URL(`${baseUrl}${path}`)
-
-    if (params) {
-      Object.entries(params).forEach(([k, v]) => {
-        if (v !== undefined && v !== null && v !== '') {
-          url.searchParams.set(k, String(v))
-        }
-      })
-    }
-
-    const res = await fetch(url.toString(), {
-      headers: {
-        'Content-Type': 'application/json',
+  async function request<T>(path: string, options: Record<string, any> = {}): Promise<ApiResponse<T>> {
+    try {
+      const token = getToken()
+      const headers = {
+        ...(options?.headers as Record<string, string> | undefined),
         ...(token ? { Authorization: `Bearer ${token}` } : {})
       }
-    })
 
-    return res.json() as Promise<ApiResponse<T>>
+      const payload = await $fetch<T | ApiResponse<T>>(path, {
+        baseURL,
+        ...options,
+        headers
+      })
+
+      return normalizeResponse<T>(payload)
+    } catch (error: any) {
+      return {
+        success: false,
+        statusCode: error?.statusCode || error?.response?.status,
+        message: error?.data?.message || error?.message || 'Request failed'
+      }
+    }
   }
 
-  async function post<T = unknown>(path: string, body?: unknown): Promise<ApiResponse<T>> {
-    const token = getToken()
+  function get<T>(path: string, query?: Record<string, string | number | boolean | undefined | null>) {
+    return request<T>(path, {
+      method: 'GET',
+      query
+    })
+  }
 
-    const res = await fetch(`${baseUrl}${path}`, {
+  function post<T>(path: string, body?: unknown) {
+    return request<T>(path, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {})
-      },
-      body: body !== undefined ? JSON.stringify(body) : undefined
+      body: body as BodyInit | Record<string, any> | undefined
     })
-
-    return res.json() as Promise<ApiResponse<T>>
   }
 
-  return { get, post }
+  function put<T>(path: string, body?: unknown) {
+    return request<T>(path, {
+      method: 'PUT',
+      body: body as BodyInit | Record<string, any> | undefined
+    })
+  }
+
+  function del<T>(path: string, body?: unknown) {
+    return request<T>(path, {
+      method: 'DELETE',
+      body: body as BodyInit | Record<string, any> | undefined
+    })
+  }
+
+  return {
+    get,
+    post,
+    put,
+    del,
+    request
+  }
 }

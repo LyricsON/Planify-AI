@@ -65,15 +65,21 @@ const content = computed(() => {
     <!-- Brand -->
     <div class="mb-7 flex items-center gap-3">
       <div class="w-8 h-8 rounded-lg bg-[var(--color-primary)] flex items-center justify-center text-white shadow-sm">
-        <UIcon name="i-lucide-sparkles" class="w-5 h-5" />
+        <UIcon
+          name="i-lucide-sparkles"
+          class="w-5 h-5"
+        />
       </div>
       <span class="text-xl font-bold tracking-tight text-[var(--color-text)]">Planify AI</span>
     </div>
 
     <!-- Hero Text -->
-    <div class="mb-7 animate-slide-up" style="animation-delay: 100ms">
+    <div
+      class="mb-7 animate-slide-up"
+      style="animation-delay: 100ms"
+    >
       <h1 class="mb-4 text-[2.5rem] font-extrabold leading-[1.08] tracking-tight text-[var(--color-text)] xl:text-[3.25rem]">
-        {{ content.headlineParts[0] }}<br />
+        {{ content.headlineParts[0] }}<br>
         <span class="text-[var(--color-primary)]">{{ content.headlineParts[1] }}</span>
       </h1>
       <p class="max-w-[25rem] text-[0.92rem] leading-[1.75] text-[var(--color-text-muted)]">
@@ -82,14 +88,20 @@ const content = computed(() => {
     </div>
 
     <!-- Preview Card -->
-    <div class="mb-8 animate-slide-up" style="animation-delay: 200ms">
+    <div
+      class="mb-8 animate-slide-up"
+      style="animation-delay: 200ms"
+    >
       <AuthPreviewCard />
     </div>
 
     <!-- Benefits -->
-    <div class="flex flex-col gap-6 animate-slide-up" style="animation-delay: 300ms">
-      <AuthFeatureItem 
-        v-for="(feature, idx) in content.features" 
+    <div
+      class="flex flex-col gap-6 animate-slide-up"
+      style="animation-delay: 300ms"
+    >
+      <AuthFeatureItem
+        v-for="(feature, idx) in content.features"
         :key="idx"
         :icon="feature.icon"
         :title="feature.title"

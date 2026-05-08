@@ -36,22 +36,31 @@ onMounted(async () => {
       <div class="flex items-center gap-3">
         <!-- Search -->
         <div class="relative">
-          <UIcon name="i-lucide-search" class="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-slate-400 pointer-events-none" />
+          <UIcon
+            name="i-lucide-search"
+            class="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-slate-400 pointer-events-none"
+          />
           <input
             placeholder="Search anything..."
             class="h-[38px] w-[240px] bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-[10px] pl-9 pr-4 text-[13px] font-medium text-slate-700 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none focus:border-indigo-400 transition"
-          />
+          >
         </div>
 
         <!-- Notifications -->
         <button class="relative size-[38px] flex items-center justify-center rounded-[10px] border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 transition">
-          <UIcon name="i-lucide-bell" class="size-4 text-slate-600 dark:text-slate-300" />
-          <span class="absolute top-1.5 right-1.5 size-[7px] rounded-full bg-indigo-500"></span>
+          <UIcon
+            name="i-lucide-bell"
+            class="size-4 text-slate-600 dark:text-slate-300"
+          />
+          <span class="absolute top-1.5 right-1.5 size-[7px] rounded-full bg-indigo-500" />
         </button>
 
         <!-- Calendar -->
         <button class="size-[38px] flex items-center justify-center rounded-[10px] border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 transition">
-          <UIcon name="i-lucide-calendar-days" class="size-4 text-slate-600 dark:text-slate-300" />
+          <UIcon
+            name="i-lucide-calendar-days"
+            class="size-4 text-slate-600 dark:text-slate-300"
+          />
         </button>
 
         <AvatarDropdown />
