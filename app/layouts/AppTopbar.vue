@@ -54,7 +54,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <header class="sticky top-0 z-30 bg-slate-50 dark:bg-slate-950 px-8 py-3">
+  <header class="sticky top-0 z-30 bg-slate-50 dark:bg-slate-950 px-5 py-3">
     <div class="flex items-center justify-between gap-4">
       <!-- Left: Dynamic page header or greeting -->
       <div>
