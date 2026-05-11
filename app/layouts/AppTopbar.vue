@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AvatarDropdown from './AvatarDropdown.vue'
 
 const { get } = useApi()
 const user = ref<any>(null)
