@@ -93,6 +93,18 @@ const tc = (t:string) => typeMap[t] || typeMap.other
 const chips = ['course','td','tp','exam','study_session','task','break','personal']
 const toggleFilter = (t:string) => { const i=activeFilters.value.indexOf(t); i>-1?activeFilters.value.splice(i,1):activeFilters.value.push(t) }
 
+// ── All Types dropdown ─────────────────────────────────────────────
+const showTypeDropdown = ref(false)
+const selectedTypeLabel = computed(() => {
+  if (activeFilters.value.length === chips.length) return 'All Types'
+  if (activeFilters.value.length === 1) return tc(activeFilters.value[0]).label
+  return `${activeFilters.value.length} Types`
+})
+function selectType(type: string | null) {
+  activeFilters.value = type === null ? [...chips] : [type]
+  showTypeDropdown.value = false
+}
+
 // ── API Fetch ─────────────────────────────────────────────────────────────────
 const { get } = useApi()
 const isLoading = ref(false)
@@ -224,9 +236,44 @@ const regenerate = async () => {
 
     <!-- Filter chips -->
     <div class="flex flex-wrap items-center gap-2 mb-5">
-      <button class="flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition">
-        All Types <UIcon name="i-lucide-chevron-down" class="size-3.5 opacity-60"/>
-      </button>
+      <!-- All Types dropdown -->
+      <div class="relative">
+        <button
+          class="flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition"
+          @click="showTypeDropdown = !showTypeDropdown">
+          {{ selectedTypeLabel }}
+          <UIcon name="i-lucide-chevron-down" class="size-3.5 opacity-60 transition-transform" :class="showTypeDropdown ? 'rotate-180' : ''"/>
+        </button>
+
+        <!-- Overlay to close on outside click -->
+        <div v-if="showTypeDropdown" class="fixed inset-0 z-40" @click="showTypeDropdown = false"/>
+
+        <!-- Dropdown menu -->
+        <div v-if="showTypeDropdown"
+          class="absolute top-full left-0 mt-1.5 w-44 bg-white border border-slate-200 rounded-xl shadow-lg z-50 py-1.5 overflow-hidden">
+
+          <!-- All Types option -->
+          <button
+            class="w-full flex items-center gap-2.5 px-3.5 py-2 text-[12px] font-semibold text-left hover:bg-slate-50 transition"
+            :class="activeFilters.length === chips.length ? 'text-indigo-600' : 'text-slate-700'"
+            @click="selectType(null)">
+            <span class="size-2 rounded-full bg-slate-400 flex-shrink-0"/>
+            All Types
+          </button>
+
+          <div class="my-1 border-t border-slate-100"/>
+
+          <!-- Individual type options -->
+          <button v-for="chip in chips" :key="chip"
+            class="w-full flex items-center gap-2.5 px-3.5 py-2 text-[12px] font-semibold text-left hover:bg-slate-50 transition"
+            :class="activeFilters.length === 1 && activeFilters.includes(chip) ? 'text-indigo-600' : 'text-slate-700'"
+            @click="selectType(chip)">
+            <span class="size-2 rounded-full flex-shrink-0" :class="tc(chip).dot"/>
+            {{ tc(chip).label }}
+          </button>
+
+        </div>
+      </div>
       <button v-for="chip in chips" :key="chip"
         class="flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold rounded-lg border transition"
         :class="activeFilters.includes(chip) ? 'border-slate-200 bg-white text-slate-700' : 'border-dashed border-slate-200 bg-slate-50 text-slate-400'"
@@ -389,17 +436,27 @@ const regenerate = async () => {
             <div v-if="!todayAgenda.length" class="text-center text-[13px] text-slate-400 py-3">
               No events today.
             </div>
-            <div v-else class="space-y-3">
-              <div v-for="ev in todayAgenda" :key="ev.id" class="flex items-center gap-3">
-                <div class="w-[52px] flex-shrink-0">
-                  <p class="text-[11px] font-bold text-slate-700">{{ fmtRange(ev.start,ev.end).split('–')[0].trim() }}</p>
-                  <p class="text-[10px] text-slate-400">{{ fmtRange(ev.start,ev.end).split('–')[1].trim() }}</p>
+            <div v-else>
+              <div v-for="(ev, idx) in todayAgenda" :key="ev.id" class="flex gap-3">
+
+                <!-- Time column -->
+                <div class="w-[44px] pt-0.5 text-right">
+                  <p class="text-[11px] font-bold text-slate-700 leading-tight agenda-card">{{ fmtRange(ev.start,ev.end).split('–')[0].trim() }}</p>
+                  <p class="text-[10px] text-slate-400 leading-tight agenda-card">{{ fmtRange(ev.start,ev.end).split('–')[1]?.trim() }}</p>
                 </div>
-                <div class="size-2.5 rounded-full flex-shrink-0" :class="tc(ev.type).dot"/>
-                <div class="min-w-0 flex-1">
-                  <p class="text-[12px] font-bold text-slate-800 truncate">{{ ev.title }}</p>
-                  <p v-if="ev.subtitle" class="text-[11px] text-slate-400 truncate">{{ ev.subtitle }}</p>
+
+                <!-- Timeline column: dot + vertical connector line -->
+                <div class="flex flex-col items-center flex-shrink-0">
+                  <div class="size-2.5 rounded-full mt-0.5 flex-shrink-0" :class="tc(ev.type).dot"/>
+                  <div v-if="idx < todayAgenda.length - 1" class="w-px bg-slate-200 flex-1 mt-1.5 rounded-full"/>
                 </div>
+
+                <!-- Content -->
+                <div class="min-w-0 flex-1" :class="idx < todayAgenda.length - 1 ? 'pb-4' : ''">
+                  <p class="text-[12px] font-bold text-slate-800 truncate leading-tight agenda-card">{{ ev.title }}</p>
+                  <p v-if="ev.subtitle" class="text-[11px] text-slate-400 truncate mt-0.5 agenda-card">{{ ev.subtitle }}</p>
+                </div>
+
               </div>
             </div>
           </div>
@@ -454,4 +511,8 @@ const regenerate = async () => {
   /* intentionally no overflow:hidden so card shadows/rounded corners render correctly */
 }
 .sidebar-col::-webkit-scrollbar { display: none; }
+
+.agenda-card {
+  margin-bottom: 0px !important;
+}
 </style>
