@@ -224,11 +224,11 @@ onMounted(load)
             <div class="sub-card">
               <h3 class="text-lg font-semibold text-[var(--color-text)]">About this course</h3>
               <p class="mt-3 text-sm leading-relaxed text-[var(--color-text-muted)]">{{ courseDescription }}</p>
-              <div class="mt-5 grid grid-cols-[120px_1fr] gap-y-2 text-sm">
-                <p class="text-[var(--color-text-muted)]">Instructor</p><p class="text-[var(--color-text)]">{{ selected.teacher || '-' }}</p>
-                <p class="text-[var(--color-text-muted)]">Credits</p><p class="text-[var(--color-text)]">{{ selected.credits ?? '-' }}</p>
-                <p class="text-[var(--color-text-muted)]">Schedule</p><p class="text-[var(--color-text)]">{{ selected.schedule || '-' }}</p>
-                <p class="text-[var(--color-text-muted)]">Location</p><p class="text-[var(--color-text)]">{{ selected.location || '-' }}</p>
+              <div class="mt-5 grid grid-cols-[150px_1fr] gap-y-2 text-sm about-meta">
+                <p class="about-meta__label text-[var(--color-text-muted)]"><UIcon name="i-lucide-user-round" class="size-4 about-meta__icon" />Instructor</p><p class="text-[var(--color-text)]">{{ selected.teacher || '-' }}</p>
+                <p class="about-meta__label text-[var(--color-text-muted)]"><UIcon name="i-lucide-badge-cent" class="size-4 about-meta__icon" />Credits</p><p class="text-[var(--color-text)]">{{ selected.credits ?? '-' }}</p>
+                <p class="about-meta__label text-[var(--color-text-muted)]"><UIcon name="i-lucide-calendar-days" class="size-4 about-meta__icon" />Schedule</p><p class="text-[var(--color-text)]">{{ selected.schedule || '-' }}</p>
+                <p class="about-meta__label text-[var(--color-text-muted)]"><UIcon name="i-lucide-map-pin" class="size-4 about-meta__icon" />Location</p><p class="text-[var(--color-text)]">{{ selected.location || '-' }}</p>
               </div>
               <div v-if="selectedTags.length" class="mt-5">
                 <p class="text-sm font-medium text-[var(--color-text)]">Tags</p>
@@ -283,13 +283,18 @@ onMounted(load)
           <div class="mt-5">
             <h3 class="text-lg font-semibold text-[var(--color-text)]">What's inside this course</h3>
             <div class="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-              <div class="mini-card" v-for="s in [{ l: 'Files', v: filesCount, i: 'i-lucide-file' }, { l: 'Summaries', v: summariesCount, i: 'i-lucide-sparkles' }, { l: 'Exercises', v: exercisesCount, i: 'i-lucide-pen-line' }, { l: 'Study Plans', v: studyPlansCount, i: 'i-lucide-calendar-days' }]" :key="s.l">
-                <div class="flex items-start justify-between">
-                  <p class="text-2xl font-semibold leading-none text-[var(--color-text)]">{{ s.v }}</p>
-                  <div class="flex size-10 items-center justify-center rounded-lg bg-[var(--color-bg)] text-[var(--color-primary)]"><UIcon :name="s.i" class="size-4" /></div>
+              <div class="mini-card mini-card--inside" v-for="s in [{ l: 'Files', v: filesCount, i: 'i-lucide-file' }, { l: 'Summaries', v: summariesCount, i: 'i-lucide-sparkles' }, { l: 'Exercises', v: exercisesCount, i: 'i-lucide-pen-line' }, { l: 'Study Plans', v: studyPlansCount, i: 'i-lucide-calendar-days' }]" :key="s.l">
+                <div class="inside-card-head">
+                  <div class="inside-card-text">
+                    <p class="inside-card-value text-[var(--color-text)]">{{ s.v }}</p>
+                    <p class="inside-card-label">{{ s.l }}</p>
+                    <button class="inside-card-link">
+                      <span>View all</span>
+                      <UIcon name="i-lucide-arrow-right" class="size-4" />
+                    </button>
+                  </div>
+                  <div class="inside-card-icon-wrap"><UIcon :name="s.i" class="size-5 inside-card-icon" /></div>
                 </div>
-                <p class="mt-2 text-sm text-[var(--color-text-muted)]">{{ s.l }}</p>
-                <button class="mt-2 text-xs font-medium text-[var(--color-primary)]">View all</button>
               </div>
             </div>
           </div>
@@ -330,7 +335,7 @@ onMounted(load)
 
         <div class="side-card side-card-lg">
           <div class="mb-4 flex items-center justify-between">
-            <h3 class="text-lg font-semibold text-[var(--color-text)]">Recent Uploads</h3>
+            <h3 class="text-lg font-semibold text-[var(--color-text)]">Recent uploads</h3>
             <NuxtLink to="/dashboard/files" class="text-xs font-semibold text-[var(--color-primary)]">View all</NuxtLink>
           </div>
           <div v-if="!files.length" class="py-4 text-center text-sm text-[var(--color-text-muted)]">No files yet.</div>
@@ -625,7 +630,7 @@ onMounted(load)
 }
 
 .file-tone-danger { color: #ef4444; }
-.file-tone-ppt { color: #64748b; }
+.file-tone-ppt { color: #f97316; }
 .file-tone-success { color: #22c55e; }
 .file-tone-info { color: #60a5fa; }
 .file-tone-primary { color: #8b5cf6; }
@@ -662,6 +667,75 @@ onMounted(load)
   background: #f8f9ff;
   padding: 10px 14px;
   font-size: 13px;
+  font-weight: 600;
+  color: #4f46e5;
+}
+
+.about-meta p {
+  margin: 0;
+}
+
+.about-meta__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.about-meta__icon {
+  color: #8a90b8;
+}
+
+.mini-card--inside {
+  padding: 16px 18px;
+}
+
+.inside-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.inside-card-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.inside-card-value {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.inside-card-icon-wrap {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f3f4fb;
+}
+
+.inside-card-icon {
+  color: #4f46e5;
+}
+
+.inside-card-label {
+  margin: 4px 0 0;
+  font-size: 12px;
+  line-height: 1.2;
+  color: #606c94;
+}
+
+.inside-card-link {
+  margin-top: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
   font-weight: 600;
   color: #4f46e5;
 }
