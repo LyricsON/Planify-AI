@@ -38,21 +38,7 @@ onMounted(load)
 
 <template>
   <section class="max-w-[1400px] mx-auto pb-10">
-    <div class="flex items-center justify-between mb-6">
-      <div>
-        <h1
-          class="text-[24px] font-bold"
-          style="color:var(--color-text)"
-        >
-          Courses
-        </h1>
-        <p
-          class="text-[13px] mt-0.5"
-          style="color:var(--color-text-muted)"
-        >
-          Organize, access and study your course materials.
-        </p>
-      </div>
+    <div class="flex items-center justify-end mb-6">
       <button
         class="flex items-center gap-2 px-4 py-2 text-[13px] font-bold text-white transition"
         style="background:var(--color-primary);border-radius:10px"

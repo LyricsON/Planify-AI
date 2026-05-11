@@ -61,21 +61,7 @@ onMounted(load)
 
 <template>
   <section class="max-w-[1400px] mx-auto pb-10">
-    <div class="flex items-center justify-between mb-6">
-      <div>
-        <h1
-          class="text-[24px] font-bold"
-          style="color:var(--color-text)"
-        >
-          Schedule
-        </h1>
-        <p
-          class="text-[13px] mt-0.5"
-          style="color:var(--color-text-muted)"
-        >
-          Plan your week. Stay consistent. Achieve your goals.
-        </p>
-      </div>
+    <div class="flex items-center justify-end mb-6">
       <div class="flex items-center gap-2">
         <button
           class="px-3 py-1.5 text-[12px] font-bold transition"

@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import AvatarDropdown from './AvatarDropdown.vue'
 
 const { get } = useApi()
 const user = ref<any>(null)
+const route = useRoute()
 
 const greeting = computed(() => {
   const hour = new Date().getHours()
@@ -10,6 +10,39 @@ const greeting = computed(() => {
   if (hour < 18) return 'Good afternoon'
   return 'Good evening'
 })
+
+const pageHeaders: Record<string, { title: string; subtitle: string }> = {
+  '/dashboard/schedule': {
+    title: 'Schedule',
+    subtitle: 'Plan your week. Stay consistent. Achieve your goals.',
+  },
+  '/dashboard/courses': {
+    title: 'Courses',
+    subtitle: 'Organize, access and study your course materials.',
+  },
+  '/dashboard/files': {
+    title: 'Files',
+    subtitle: 'Manage, organize and access all your study materials in one place.',
+  },
+  '/dashboard/tasks': {
+    title: 'Tasks & Exams',
+    subtitle: 'Stay on top of your deadlines and focus on what matters.',
+  },
+  '/dashboard/exams': {
+    title: 'Tasks & Exams',
+    subtitle: 'Stay on top of your deadlines and focus on what matters.',
+  },
+  '/dashboard/assistant': {
+    title: 'AI Assistant',
+    subtitle: 'Your smart study companion.',
+  },
+  '/dashboard/analytics': {
+    title: 'Analytics',
+    subtitle: 'Track your progress and discover insights to study smarter.',
+  },
+}
+
+const currentHeader = computed(() => pageHeaders[route.path] ?? null)
 
 onMounted(async () => {
   try {
@@ -22,14 +55,24 @@ onMounted(async () => {
 <template>
   <header class="sticky top-0 z-30 bg-slate-50 dark:bg-slate-950 px-8 py-3">
     <div class="flex items-center justify-between gap-4">
-      <!-- Left: Greeting -->
+      <!-- Left: Dynamic page header or greeting -->
       <div>
-        <h1 class="text-[24px] font-bold text-slate-900 dark:text-white leading-tight">
-          {{ greeting }}, {{ user?.name?.split(' ')[0] || 'User' }}! 👋
-        </h1>
-        <p class="text-[14px] text-slate-500 dark:text-slate-400 font-medium mt-0.5">
-          Let's make today productive and focused.
-        </p>
+        <template v-if="currentHeader">
+          <h1 class="text-[24px] font-bold text-slate-900 dark:text-white leading-tight">
+            {{ currentHeader.title }}
+          </h1>
+          <p class="text-[14px] text-slate-500 dark:text-slate-400 font-medium mt-0.5">
+            {{ currentHeader.subtitle }}
+          </p>
+        </template>
+        <template v-else>
+          <h1 class="text-[24px] font-bold text-slate-900 dark:text-white leading-tight">
+            {{ greeting }}, {{ user?.name?.split(' ')[0] || 'User' }}! 👋
+          </h1>
+          <p class="text-[14px] text-slate-500 dark:text-slate-400 font-medium mt-0.5">
+            Let's make today productive and focused.
+          </p>
+        </template>
       </div>
 
       <!-- Right: Search + Actions -->
@@ -63,7 +106,6 @@ onMounted(async () => {
           />
         </button>
 
-        <AvatarDropdown />
       </div>
     </div>
   </header>

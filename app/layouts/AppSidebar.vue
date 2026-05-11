@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 const { get } = useApi()
 const route = useRoute()
+const router = useRouter()
 
 const user = ref<any>(null)
 const tokenBalance = ref<number | null>(null)
@@ -25,6 +26,27 @@ const isRouteActive = (path: string) => {
   }
   return route.path.startsWith(path)
 }
+
+async function handleSignOut() {
+  try {
+    await get<any>('/auth/logout')
+  } catch {}
+  localStorage.removeItem('token')
+  router.push('/login')
+}
+
+const profileMenuItems = [
+  [
+    { label: 'My Profile', icon: 'i-lucide-user', click: () => router.push('/settings/profile') },
+    { label: 'Security', icon: 'i-lucide-shield', click: () => router.push('/settings/security') },
+    { label: 'Notifications', icon: 'i-lucide-bell', click: () => router.push('/settings/notifications') },
+    { label: 'Study Preferences', icon: 'i-lucide-settings-2', click: () => router.push('/settings/study-preferences') },
+    { label: 'Billing', icon: 'i-lucide-credit-card', click: () => router.push('/settings/billing') },
+  ],
+  [
+    { label: 'Sign out', icon: 'i-lucide-log-out', color: 'error' as const, click: handleSignOut },
+  ]
+]
 
 onMounted(async () => {
   try {
@@ -197,37 +219,39 @@ onMounted(async () => {
         </div>
 
         <!-- Profile Card -->
-        <div class="flex items-center gap-3 rounded-[16px] border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-3 hover:bg-slate-50 dark:hover:bg-slate-800 transition cursor-pointer shadow-[0_2px_8px_-4px_rgba(0,0,0,0.05)]">
-          <UAvatar
-            v-if="user"
-            :src="user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=random`"
-            :alt="user.name"
-            size="sm"
-            class="rounded-full size-[36px]"
-          />
-          <UAvatar
-            v-else
-            size="sm"
-            icon="i-lucide-user"
-            class="rounded-full size-[36px]"
-          />
-
-          <div class="min-w-0 flex-1 pl-1">
-            <p class="truncate text-[13px] font-bold text-[#312e81] dark:text-white leading-tight">
-              {{ user ? user.name : 'Loading...' }}
-            </p>
-            <p class="text-[11px] font-bold text-slate-500 dark:text-slate-400 capitalize truncate mt-0.5">
-              {{ plan ? plan + ' Plan' : 'Student Plan' }}
-            </p>
-          </div>
-
-          <div class="size-6 flex items-center justify-center rounded-full bg-slate-50 dark:bg-slate-800 text-slate-400">
-            <UIcon
-              name="i-lucide-chevron-down"
-              class="size-3.5"
+        <UDropdownMenu :items="profileMenuItems" :popper="{ placement: 'top-start' }">
+          <div class="flex items-center gap-3 rounded-[16px] border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-3 hover:bg-slate-50 dark:hover:bg-slate-800 transition cursor-pointer shadow-[0_2px_8px_-4px_rgba(0,0,0,0.05)]">
+            <UAvatar
+              v-if="user"
+              :src="user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=random`"
+              :alt="user.name"
+              size="sm"
+              class="rounded-full size-[36px]"
             />
+            <UAvatar
+              v-else
+              size="sm"
+              icon="i-lucide-user"
+              class="rounded-full size-[36px]"
+            />
+
+            <div class="min-w-0 flex-1 pl-1">
+              <p class="truncate text-[13px] font-bold text-[#312e81] dark:text-white leading-tight">
+                {{ user ? user.name : 'Loading...' }}
+              </p>
+              <p class="text-[11px] font-bold text-slate-500 dark:text-slate-400 capitalize truncate mt-0.5">
+                {{ plan ? plan + ' Plan' : 'Student Plan' }}
+              </p>
+            </div>
+
+            <div class="size-6 flex items-center justify-center rounded-full bg-slate-50 dark:bg-slate-800 text-slate-400">
+              <UIcon
+                name="i-lucide-chevron-up"
+                class="size-3.5"
+              />
+            </div>
           </div>
-        </div>
+        </UDropdownMenu>
       </div>
     </div>
   </aside>

@@ -60,21 +60,7 @@ onMounted(load)
 
 <template>
   <section class="max-w-[1400px] mx-auto pb-10">
-    <div class="flex items-center justify-between mb-6">
-      <div>
-        <h1
-          class="text-[24px] font-bold"
-          style="color:var(--color-text)"
-        >
-          Tasks & Exams
-        </h1>
-        <p
-          class="text-[13px] mt-0.5"
-          style="color:var(--color-text-muted)"
-        >
-          Stay on top of your deadlines and focus on what matters.
-        </p>
-      </div>
+    <div class="flex items-center justify-end mb-6">
       <button
         class="flex items-center gap-2 px-4 py-2 text-[13px] font-bold text-white"
         style="border-radius:10px;background:var(--color-primary)"
