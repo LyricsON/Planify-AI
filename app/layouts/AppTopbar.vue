@@ -107,7 +107,6 @@ onMounted(async () => {
           />
         </button>
 
-        <AvatarDropdown />
       </div>
     </div>
   </header>

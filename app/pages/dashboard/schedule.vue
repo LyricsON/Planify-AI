@@ -51,7 +51,27 @@ function nextWeek(){ const d=new Date(weekStart.value); d.setDate(d.getDate()+7)
 function goToday(){ weekStart.value=getWeekStart(today) }
 
 const now = ref(new Date())
-onMounted(()=>{ setInterval(()=>now.value=new Date(),60000) })
+
+// ── Calendar height sync ─────────────────────────────────────────────────────
+// Measure the actual rendered calendar card height and apply it to the sidebar
+// so both columns share the exact same bottom edge.
+const calCardRef = ref<HTMLElement | null>(null)
+const sidebarH   = ref(0)
+let ro: ResizeObserver | null = null
+
+onMounted(() => {
+  setInterval(() => now.value = new Date(), 60000)
+  nextTick(() => {
+    if (calCardRef.value) {
+      sidebarH.value = calCardRef.value.offsetHeight
+      ro = new ResizeObserver(entries => {
+        sidebarH.value = entries[0].contentRect.height
+      })
+      ro.observe(calCardRef.value)
+    }
+  })
+})
+onUnmounted(() => ro?.disconnect())
 const nowH = computed(()=> now.value.getHours()+now.value.getMinutes()/60)
 const nowLabel = computed(()=> now.value.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}))
 const nowTop = computed(()=> nowH.value>=START_H&&nowH.value<END_H ? (nowH.value-START_H)*HOUR_H : -1)
@@ -158,10 +178,10 @@ const regenerate = async () => {
   <section class="max-w-[1600px] mx-auto pb-10">
 
     <!-- Controls Bar: uses same 2-col grid as main layout -->
-    <div class="grid xl:grid-cols-[1fr_320px] gap-5 mb-4 items-center">
+    <div class="grid xl:grid-cols-[1fr_340px] gap-5 mb-4 items-center">
 
       <!-- Left col: nav, view switcher, filters grouped together on the left -->
-      <div class="flex items-center gap-6">
+      <div class="flex items-center justify-between gap-6">
         <!-- Navigation -->
         <div class="flex items-center gap-2">
           <button
@@ -216,11 +236,11 @@ const regenerate = async () => {
       </button>
     </div>
 
-    <!-- Main layout -->
-    <div class="grid gap-5 xl:grid-cols-[1fr_320px] items-start">
+    <!-- Main layout: calendar natural height, sidebar capped to same -->
+    <div class="grid gap-5 xl:grid-cols-[1fr_340px] items-start">
 
-      <!-- Calendar Card -->
-      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm relative overflow-x-auto no-scrollbar">
+      <!-- Calendar Card: frozen headers + scrollable time grid -->
+      <div ref="calCardRef" class="bg-white rounded-2xl border border-slate-200 shadow-sm relative overflow-x-auto no-scrollbar">
         <!-- Loading overlay -->
         <div v-if="isLoading" class="absolute inset-0 z-20 flex items-center justify-center bg-white/80 rounded-2xl">
           <UIcon name="i-lucide-loader-2" class="size-8 animate-spin text-indigo-500"/>
@@ -230,20 +250,20 @@ const regenerate = async () => {
         <div class="grid border-b border-slate-100" style="grid-template-columns:56px repeat(7,1fr)">
           <div class="border-r border-slate-100"/>
           <div v-for="(day,i) in weekDays" :key="i"
-            class="py-3 text-center border-r border-slate-100 last:border-r-0"
-            :class="isToday(day) ? 'bg-indigo-50' : ''">
-            <p class="text-[11px] font-bold uppercase tracking-wide"
-               :class="isWeekend(day) ? 'text-red-400' : 'text-slate-400'">
-              {{ day.toLocaleDateString('en-GB',{weekday:'short'}) }}
-            </p>
-            <div class="mx-auto mt-1 flex items-center justify-center size-7 rounded-full text-[14px] font-bold transition"
-                 :class="isToday(day) ? 'bg-indigo-600 text-white' : isWeekend(day) ? 'text-red-500' : 'text-slate-800'">
-              {{ day.getDate() }}
+            class="py-2 text-center border-r border-slate-100 last:border-r-0 flex items-center justify-center">
+            <div class="inline-flex flex-col items-center px-6 py-2 rounded-[8px] transition"
+                 :class="isToday(day) ? 'bg-indigo-50 border border-indigo-200' : ''">
+              <!-- Day name: Mon, Tue, etc. -->
+              <span class="text-[12px] font-bold leading-tight"
+                    :class="isWeekend(day) ? 'text-red-500' : isToday(day) ? 'text-indigo-600' : 'text-slate-700'">
+                {{ day.toLocaleDateString('en-GB',{weekday:'short'}) }}
+              </span>
+              <!-- Date + Month on one line -->
+              <span class="text-[11px] leading-tight mt-0.5"
+                    :class="isWeekend(day) ? 'text-red-400' : isToday(day) ? 'text-indigo-500' : 'text-slate-400'">
+                {{ day.getDate() }} {{ day.toLocaleDateString('en-GB',{month:'short'}) }}
+              </span>
             </div>
-            <p class="text-[10px] mt-0.5"
-               :class="isWeekend(day) ? 'text-red-400' : 'text-slate-400'">
-              {{ day.toLocaleDateString('en-GB',{month:'short'}) }}
-            </p>
           </div>
         </div>
 
@@ -261,7 +281,7 @@ const regenerate = async () => {
           </div>
         </div>
 
-        <!-- Time grid (full height, no scroll) -->
+        <!-- Time grid -->
         <div>
           <div class="flex" :style="{height: hours.length*HOUR_H+'px'}">
 
@@ -298,13 +318,11 @@ const regenerate = async () => {
                   <p v-if="ev.subtitle && eHeight(ev.start,ev.end)>36" class="text-[10px] opacity-70 truncate">{{ ev.subtitle }}</p>
                 </div>
 
-                <!-- Current time indicator (only today's column) -->
+                <!-- Current time indicator -->
                 <template v-if="isToday(day)&&isCurrentWeek()&&nowTop>=0">
                   <div class="absolute left-0 right-0 z-10 pointer-events-none" :style="{top: nowTop+'px'}">
                     <div class="relative border-t-2 border-indigo-500">
-                      <span class="absolute -top-3 -left-14 bg-indigo-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow">
-                        {{ nowLabel }}
-                      </span>
+                      <span class="absolute -top-3 -left-14 bg-indigo-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow">{{ nowLabel }}</span>
                       <div class="absolute -top-1.5 -left-1 size-3 rounded-full bg-indigo-600 border-2 border-white shadow"/>
                     </div>
                   </div>
@@ -315,10 +333,10 @@ const regenerate = async () => {
         </div>
       </div>
 
-      <!-- Right sidebar: fixed height, only agenda scrolls internally -->
-      <div class="flex flex-col gap-5 sticky top-4 w-full min-h-0" style="max-height: calc(100vh - 2rem)">
+      <!-- Right sidebar: exact same height as calendar card, measured at runtime -->
+      <div class="sidebar-col flex flex-col gap-5" :style="sidebarH ? {height: sidebarH + 'px'} : {}">
 
-        <!-- AI Suggestions -->
+        <!-- AI Suggestions (fixed height) -->
         <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex-shrink-0">
           <div class="flex items-start justify-between mb-1">
             <div class="flex items-center gap-2">
@@ -357,23 +375,21 @@ const regenerate = async () => {
           </button>
         </div>
 
-        <!-- Today's Agenda -->
-        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col min-h-0">
-          
-          <!-- Fixed Header -->
-          <div class="flex items-center justify-between p-5 pb-3 flex-shrink-0 border-b border-transparent">
+        <!-- Today's Agenda: flex-1 fills remaining sidebar height -->
+        <div class="flex-1 min-h-0 bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col overflow-hidden">
+
+          <!-- Header: always visible, never scrolls -->
+          <div class="flex items-center justify-between px-5 py-4 flex-shrink-0 border-b border-slate-100">
             <h3 class="text-[14px] font-bold text-slate-800">Today's Agenda</h3>
-            <button class="text-[12px] font-bold text-indigo-600 hover:text-indigo-700">View all</button>
+            <button class="text-[12px] font-bold text-indigo-600 hover:text-indigo-700 transition">View all</button>
           </div>
 
-          <!-- Empty State -->
-          <div v-if="!todayAgenda.length" class="px-5 pb-5 text-center text-[13px] text-slate-400 flex-shrink-0">
-            No events today.
-          </div>
-
-          <!-- Scrollable Agenda List -->
-          <div class="flex-1 overflow-y-auto no-scrollbar px-5 pb-2 min-h-0">
-            <div class="space-y-3">
+          <!-- List: fills remaining card height, scrolls when items overflow -->
+          <div class="flex-1 overflow-y-auto no-scrollbar px-5 py-3 min-h-0">
+            <div v-if="!todayAgenda.length" class="text-center text-[13px] text-slate-400 py-3">
+              No events today.
+            </div>
+            <div v-else class="space-y-3">
               <div v-for="ev in todayAgenda" :key="ev.id" class="flex items-center gap-3">
                 <div class="w-[52px] flex-shrink-0">
                   <p class="text-[11px] font-bold text-slate-700">{{ fmtRange(ev.start,ev.end).split('–')[0].trim() }}</p>
@@ -388,8 +404,8 @@ const regenerate = async () => {
             </div>
           </div>
 
-          <!-- Fixed Footer Button -->
-          <div class="p-5 pt-3 flex-shrink-0 border-t border-transparent">
+          <!-- Footer button: always visible, never scrolls -->
+          <div class="px-5 py-4 flex-shrink-0 border-t border-slate-100 bg-white">
             <button class="w-full flex items-center justify-center gap-2 py-2 text-[12px] font-bold text-slate-700 rounded-xl border border-slate-200 hover:bg-slate-50 transition">
               <UIcon name="i-lucide-external-link" class="size-3.5"/>Open Full Agenda
             </button>
@@ -424,11 +440,18 @@ const regenerate = async () => {
 </template>
 
 <style scoped>
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
+/* ── Scrollbar hiding ─────────────────────────────────────────── */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/*
+  Sidebar height is set inline (measured from calCardRef at runtime).
+  No overflow:hidden needed — the Today's Agenda card handles its own
+  internal overflow, and the sidebar's definite height prevents children
+  from growing beyond it while preserving card shadows and border-radius.
+*/
+.sidebar-col {
+  /* intentionally no overflow:hidden so card shadows/rounded corners render correctly */
 }
-.no-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
+.sidebar-col::-webkit-scrollbar { display: none; }
 </style>
