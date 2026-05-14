@@ -15,16 +15,34 @@ const navItems = [
   { label: 'Schedule', icon: 'i-lucide-calendar-days', to: '/dashboard/schedule' },
   { label: 'Courses', icon: 'i-lucide-book-open', to: '/dashboard/courses' },
   { label: 'Files', icon: 'i-lucide-file-text', to: '/dashboard/files' },
-  { label: 'Tasks & Exams', icon: 'i-lucide-clipboard-check', to: '/dashboard/tasks' },
+  { label: 'Exams', icon: 'i-lucide-circle-check', to: '/dashboard/exams?tab=overview' },
+  { label: 'Tasks', icon: 'i-lucide-square-check-big', to: '/dashboard/tasks' },
   { label: 'AI Assistant', icon: 'i-lucide-sparkles', to: '/dashboard/assistant' },
   { label: 'Analytics', icon: 'i-lucide-chart-column', to: '/dashboard/analytics' }
 ]
 
 const isRouteActive = (path: string) => {
+  const [basePath, query] = path.split('?')
+  const q = new URLSearchParams(query || '')
+  const targetTab = q.get('tab')
+
   if (path === '/dashboard') {
     return route.path === '/dashboard' || route.path === '/' || route.path === '/home'
   }
-  return route.path.startsWith(path)
+
+  if (basePath === '/dashboard/tasks' && targetTab) {
+    return route.path === '/dashboard/tasks' && String(route.query.tab || '') === targetTab
+  }
+
+  if (basePath === '/dashboard/tasks' && !targetTab) {
+    return route.path === '/dashboard/tasks' && !route.query.tab
+  }
+
+  if (basePath === '/dashboard/exams') {
+    return route.path === '/dashboard/exams'
+  }
+
+  return route.path.startsWith(basePath)
 }
 
 async function handleSignOut() {

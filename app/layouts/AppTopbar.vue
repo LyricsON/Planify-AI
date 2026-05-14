@@ -26,11 +26,11 @@ const pageHeaders: Record<string, { title: string; subtitle: string }> = {
     subtitle: 'Manage, organize and access all your study materials in one place.',
   },
   '/dashboard/tasks': {
-    title: 'Tasks & Exams',
+    title: 'Exams & Tasks',
     subtitle: 'Stay on top of your deadlines and focus on what matters.',
   },
   '/dashboard/exams': {
-    title: 'Tasks & Exams',
+    title: 'Exams & Tasks',
     subtitle: 'Stay on top of your deadlines and focus on what matters.',
   },
   '/dashboard/assistant': {
@@ -43,7 +43,22 @@ const pageHeaders: Record<string, { title: string; subtitle: string }> = {
   },
 }
 
-const currentHeader = computed(() => pageHeaders[route.path] ?? null)
+const currentHeader = computed(() => {
+  if (route.path === '/dashboard/tasks') {
+    const q = String(route.query.tab || '')
+    if (q === 'overview' || q === 'exams' || q === 'tasks') {
+      return {
+        title: 'Exams & Tasks',
+        subtitle: 'Stay on top of your deadlines and focus on what matters.',
+      }
+    }
+    return {
+      title: 'Tasks',
+      subtitle: 'Track assignments, progress, and deadlines.',
+    }
+  }
+  return pageHeaders[route.path] ?? null
+})
 
 onMounted(async () => {
   try {
