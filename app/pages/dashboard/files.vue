@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, onUnmounted } from 'vue'
 
 definePageMeta({ layout: 'dashboard' })
 const { get, post } = useApi()
@@ -13,16 +13,41 @@ const selectedFolder = ref('')
 const selectedFile = ref<any>(null)
 const uploadRef = ref<HTMLInputElement | null>(null)
 
+const isDetailsModalOpen = ref(false)
+const modalFile = ref<any>(null)
+const openDetailsModal = (file: any) => {
+  modalFile.value = file
+  isDetailsModalOpen.value = true
+}
+
 // Filters & State
 const activeTab = ref('All Files')
+const isTypeDropdownOpen = ref(false)
+const typeDropdownRef = ref<HTMLElement | null>(null)
 const tabs = [
   { name: 'All Files', icon: 'i-lucide-layers', color: 'indigo' },
   { name: 'PDF', icon: 'i-lucide-file-text', color: 'rose' },
   { name: 'Excel', icon: 'i-lucide-file-spreadsheet', color: 'emerald' },
+  { name: 'PowerPoint', icon: 'i-lucide-presentation', color: 'orange' },
   { name: 'Images', icon: 'i-lucide-image', color: 'purple' },
   { name: 'Docs', icon: 'i-lucide-file-type', color: 'blue' },
   { name: 'Notes', icon: 'i-lucide-notebook', color: 'amber' },
 ]
+
+const activeTabMeta = computed(() => tabs.find(t => t.name === activeTab.value) || tabs[0])
+
+const selectTab = (name: string) => {
+  activeTab.value = name
+  isTypeDropdownOpen.value = false
+}
+
+const handleClickOutside = (e: MouseEvent) => {
+  if (typeDropdownRef.value && !typeDropdownRef.value.contains(e.target as Node)) {
+    isTypeDropdownOpen.value = false
+  }
+}
+onMounted(() => document.addEventListener('mousedown', handleClickOutside))
+onUnmounted(() => document.removeEventListener('mousedown', handleClickOutside))
 
 const page = ref(1)
 const total = ref(0)
@@ -81,6 +106,7 @@ const getTypesForTab = (tabName: string): string[] => {
   const types: Record<string, string[]> = {
     'PDF': ['pdf'],
     'Excel': ['xlsx', 'xls', 'csv'],
+    'PowerPoint': ['pptx', 'ppt'],
     'Images': ['png', 'jpg', 'jpeg', 'gif', 'svg'],
     'Docs': ['docx', 'doc', 'txt'],
     'Notes': ['notes'] 
@@ -133,6 +159,7 @@ const getFileIcon = (t: string) => {
   const type = t?.toLowerCase()
   if (['pdf'].includes(type)) return 'i-lucide-file-text'
   if (['xlsx', 'xls', 'csv'].includes(type)) return 'i-lucide-file-spreadsheet'
+  if (['pptx', 'ppt'].includes(type)) return 'i-lucide-presentation'
   if (['docx', 'doc', 'txt'].includes(type)) return 'i-lucide-file-type'
   if (['png', 'jpg', 'jpeg', 'gif'].includes(type)) return 'i-lucide-image'
   return 'i-lucide-file'
@@ -142,6 +169,7 @@ const getFileColorClass = (t: string) => {
   const type = t?.toLowerCase()
   if (['pdf'].includes(type)) return 'text-rose-500 bg-rose-50 dark:bg-rose-500/10'
   if (['xlsx', 'xls', 'csv'].includes(type)) return 'text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10'
+  if (['pptx', 'ppt'].includes(type)) return 'text-orange-500 bg-orange-50 dark:bg-orange-500/10'
   if (['docx', 'doc', 'txt'].includes(type)) return 'text-blue-500 bg-blue-50 dark:bg-blue-500/10'
   if (['png', 'jpg', 'jpeg', 'gif'].includes(type)) return 'text-purple-500 bg-purple-50 dark:bg-purple-500/10'
   return 'text-slate-500 bg-slate-100 dark:bg-slate-800'
@@ -218,64 +246,102 @@ const recentUploads = computed(() => {
 <template>
   <div class="max-w-[1400px] mx-auto pb-10 flex flex-col gap-6">
 
-    <!-- Filters & Actions Top Row -->
-    <div class="flex flex-wrap items-center justify-between gap-4">
-      <!-- Tabs -->
-      <div class="flex items-center gap-2 overflow-x-auto pb-2 sm:pb-0 hide-scrollbar">
-        <button
-          v-for="tab in tabs"
-          :key="tab.name"
-          @click="activeTab = tab.name"
-          class="flex items-center gap-2 px-4 py-2 rounded-[10px] text-[13px] font-bold transition-all whitespace-nowrap"
-          :class="[
-            activeTab === tab.name 
-              ? 'bg-indigo-600 text-white border-2 border-slate-900 dark:border-slate-100 shadow-sm' 
-              : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
-          ]"
-        >
-          <UIcon :name="tab.icon" class="size-4" :class="activeTab === tab.name ? 'text-white' : `text-${tab.color}-500`" />
-          {{ tab.name }}
-        </button>
-      </div>
-
-      <!-- Right Actions -->
-      <div class="flex items-center gap-3">
-        <!-- Sort Dropdown -->
-        <div class="flex items-center gap-2 px-3 py-2 rounded-[10px] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 cursor-pointer">
-          <span class="text-[13px] text-slate-500 font-medium">Sort by:</span>
-          <span class="text-[13px] text-slate-700 dark:text-slate-200 font-bold">Last updated</span>
-          <UIcon name="i-lucide-chevron-down" class="size-4 text-slate-400" />
-        </div>
-        <!-- View Toggle -->
-        <div class="flex items-center bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[10px] p-1">
-          <button class="p-1.5 rounded-[8px] text-indigo-600 bg-indigo-50 dark:bg-indigo-500/10">
-            <UIcon name="i-lucide-layout-grid" class="size-4" />
-          </button>
-          <button class="p-1.5 rounded-[8px] text-slate-400 hover:text-slate-600">
-            <UIcon name="i-lucide-list" class="size-4" />
-          </button>
-        </div>
-        <!-- Upload Button -->
-        <button
-          @click="uploadRef?.click()"
-          class="flex items-center gap-2 px-5 py-2.5 rounded-[10px] bg-indigo-600 hover:bg-indigo-700 text-white text-[13px] font-bold transition shadow-sm"
-        >
-          <UIcon name="i-lucide-plus" class="size-4" />
-          Upload Files
-        </button>
-        <input ref="uploadRef" type="file" class="hidden" @change="upload" accept=".pdf,.docx,.pptx,.xlsx,.png,.jpg,.jpeg">
-      </div>
-    </div>
-
     <div v-if="isLoading" class="flex items-center justify-center py-20">
       <UIcon name="i-lucide-loader-2" class="size-8 animate-spin text-indigo-600" />
     </div>
 
     <!-- Main Grid -->
-    <div v-else class="grid grid-cols-1 xl:grid-cols-[1fr_320px] 2xl:grid-cols-[1fr_360px] gap-6 items-start">
+    <div v-else class="grid grid-cols-1 xl:grid-cols-[1fr_340px] 2xl:grid-cols-[1fr_340px] gap-6 items-start">
       
       <!-- LEFT COLUMN -->
-      <div class="flex flex-col gap-6">
+      <div class="flex flex-col gap-5">
+
+        <!-- LEFT: Filters Row (independent of right column) -->
+        <div class="flex items-center justify-between gap-2">
+
+          <!-- File Type Dropdown -->
+          <div class="relative" ref="typeDropdownRef">
+            <button
+              @click="isTypeDropdownOpen = !isTypeDropdownOpen"
+              class="flex items-center gap-2 pl-3 pr-2.5 py-1.5 rounded-[8px] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[12px] font-bold text-slate-700 dark:text-slate-200 shadow-sm hover:border-indigo-400 dark:hover:border-indigo-500 transition-all whitespace-nowrap w-[160px] justify-between"
+              :class="isTypeDropdownOpen ? 'border-indigo-300 dark:border-indigo-500/50 ring-2 ring-indigo-500/15' : ''"
+              aria-haspopup="listbox"
+              :aria-expanded="isTypeDropdownOpen"
+            >
+              <span class="flex items-center gap-1.5">
+                <UIcon :name="activeTabMeta.icon" class="size-3.5" :class="`text-${activeTabMeta.color}-500`" />
+                {{ activeTabMeta.name }}
+              </span>
+              <UIcon
+                name="i-lucide-chevron-down"
+                class="size-3.5 text-slate-400 transition-transform duration-200"
+                :class="isTypeDropdownOpen ? 'rotate-180' : ''"
+              />
+            </button>
+
+            <!-- Dropdown Panel -->
+            <Transition
+              enter-active-class="transition ease-out duration-150"
+              enter-from-class="opacity-0 translate-y-[-4px] scale-[0.98]"
+              enter-to-class="opacity-100 translate-y-0 scale-100"
+              leave-active-class="transition ease-in duration-100"
+              leave-from-class="opacity-100 translate-y-0 scale-100"
+              leave-to-class="opacity-0 translate-y-[-4px] scale-[0.98]"
+            >
+              <div
+                v-if="isTypeDropdownOpen"
+                role="listbox"
+                class="absolute top-full left-0 mt-1.5 z-50 w-[160px] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[10px] shadow-lg shadow-slate-900/8 dark:shadow-slate-900/40 py-1.5 overflow-hidden"
+              >
+                <button
+                  v-for="tab in tabs"
+                  :key="tab.name"
+                  role="option"
+                  :aria-selected="activeTab === tab.name"
+                  @click="selectTab(tab.name)"
+                  class="w-full flex items-center gap-2.5 px-3 py-1.5 text-[12px] font-semibold transition-colors text-left"
+                  :class="[
+                    activeTab === tab.name
+                      ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400'
+                      : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                  ]"
+                >
+                  <UIcon
+                    :name="tab.icon"
+                    class="size-3.5 shrink-0"
+                    :class="activeTab === tab.name ? 'text-indigo-500' : `text-${tab.color}-500`"
+                  />
+                  {{ tab.name }}
+                  <UIcon
+                    v-if="activeTab === tab.name"
+                    name="i-lucide-check"
+                    class="size-3 ml-auto text-indigo-500 shrink-0"
+                  />
+                </button>
+              </div>
+            </Transition>
+          </div>
+
+          <!-- Sort + View Toggle (right side of left filter bar) -->
+          <div class="flex flex-row items-center gap-2">
+            <!-- Sort Dropdown -->
+            <div class="flex items-center gap-2 px-3 py-1.5 rounded-[8px] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 cursor-pointer shadow-sm hover:border-indigo-400 dark:hover:border-indigo-500 transition-all">
+              <span class="text-[12px] text-slate-500 font-medium">Sort by:</span>
+              <span class="text-[12px] text-slate-700 dark:text-slate-200 font-bold">Last updated</span>
+              <UIcon name="i-lucide-chevron-down" class="size-3.5 text-slate-400" />
+            </div>
+
+            <!-- View Toggle -->
+            <div class="flex items-center bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[8px] py-1 px-1 shadow-sm">
+              <button class="px-1 rounded-[6px] text-indigo-600 bg-indigo-50 dark:bg-indigo-500/10">
+                <UIcon name="i-lucide-layout-grid" class="size-3.5" />
+              </button>
+              <button class="px-1 rounded-[6px] text-slate-400 hover:text-slate-600 transition-colors">
+                <UIcon name="i-lucide-list" class="size-3.5" />
+              </button>
+            </div>
+          </div>
+        </div>
         
         <!-- Upload Dropzone -->
         <div 
@@ -307,12 +373,12 @@ const recentUploads = computed(() => {
             <div
               v-for="(folder, i) in displayFolders"
               :key="folder._id || i"
-              class="flex items-center gap-3 p-3 rounded-[12px] bg-white dark:bg-slate-900 shadow-sm cursor-pointer hover:shadow-md transition"
+              class="flex items-center gap-3 p-3 rounded-[12px] bg-white dark:bg-slate-900 cursor-pointer transition-all duration-300 ease-out"
               @click="selectedFolder = selectedFolder === folder._id ? '' : folder._id"
               :class="[
                  selectedFolder === folder._id
-                    ? 'border-[1.5px] border-indigo-500 ring-1 ring-indigo-500/20'
-                    : 'border border-slate-200 dark:border-slate-800 hover:border-indigo-200 dark:hover:border-indigo-500/30'
+                    ? 'border-[1.5px] border-indigo-500 ring-2 ring-indigo-500/20 shadow-sm'
+                    : 'border border-slate-200 dark:border-slate-800 shadow-sm hover:border-indigo-400 dark:hover:border-indigo-500/50 hover:ring-[3px] hover:ring-indigo-400/20 dark:hover:ring-indigo-500/20 hover:shadow-md hover:shadow-indigo-500/5 hover:-translate-y-0.5'
               ]"
             >
               <div class="flex items-center justify-center shrink-0" :class="(folder.colorClass || getFolderColor(i)).split(' ')[0]">
@@ -340,15 +406,15 @@ const recentUploads = computed(() => {
           </div>
           
           <div class="overflow-x-auto">
-            <table class="w-full text-left border-collapse min-w-[700px]">
+            <table class="w-full text-left border-collapse min-w-[700px] table-fixed">
               <thead>
                 <tr class="border-b border-slate-100 dark:border-slate-800/50 bg-slate-50/50 dark:bg-slate-800/20">
-                  <th class="py-3 px-5 text-[12px] font-semibold text-slate-500 tracking-wider">Name</th>
-                  <th class="py-3 px-5 text-[12px] font-semibold text-slate-500 tracking-wider">Course</th>
-                  <th class="py-3 px-5 text-[12px] font-semibold text-slate-500 tracking-wider">Size</th>
-                  <th class="py-3 px-5 text-[12px] font-semibold text-slate-500 tracking-wider">Uploaded</th>
-                  <th class="py-3 px-5 text-[12px] font-semibold text-slate-500 tracking-wider">Tags</th>
-                  <th class="py-3 px-5 text-[12px] font-semibold text-slate-500 tracking-wider text-right"></th>
+                  <th class="py-3 px-5 text-[12px] font-semibold text-slate-500 tracking-wider w-[35%]">Name</th>
+                  <th class="py-3 px-2 text-[12px] font-semibold text-slate-500 tracking-wider w-[12%]">Course</th>
+                  <th class="py-3 px-2 text-[12px] font-semibold text-slate-500 tracking-wider w-[10%]">Size</th>
+                  <th class="py-3 px-2 text-[12px] font-semibold text-slate-500 tracking-wider w-[15%]">Uploaded</th>
+                  <th class="py-3 px-2 text-[12px] font-semibold text-slate-500 tracking-wider w-[18%]">Tags</th>
+                  <th class="py-3 px-2 text-[12px] font-semibold text-slate-500 tracking-wider text-right w-[20%]"></th>
                 </tr>
               </thead>
               <tbody>
@@ -360,38 +426,47 @@ const recentUploads = computed(() => {
                   :class="{ 'bg-indigo-50/30 dark:bg-indigo-500/5': selectedFile?._id === file._id }"
                 >
                   <td class="py-3 px-5">
-                    <div class="flex items-center gap-3">
+                    <div class="flex items-center gap-3 w-full">
                       <div class="size-[32px] rounded-[8px] flex items-center justify-center shrink-0 border border-slate-100 dark:border-slate-700/50" :class="getFileColorClass(file.type)">
                         <UIcon :name="getFileIcon(file.type)" class="size-[18px]" />
                       </div>
-                      <span class="text-[13px] font-bold text-slate-900 dark:text-white truncate max-w-[200px]">
+                      <span class="text-[13px] font-bold text-slate-900 dark:text-white truncate flex-1 min-w-0">
                         {{ file.originalName || file.fileName }}
                       </span>
                     </div>
                   </td>
-                  <td class="py-3 px-5 text-[13px] text-slate-500">
+                  <td class="py-3 px-2 text-[13px] text-slate-500">
                     {{ file.courseId?.title || 'General' }}
                   </td>
-                  <td class="py-3 px-5 text-[13px] text-slate-500 font-medium">
+                  <td class="py-3 px-2 text-[13px] text-slate-500 font-medium">
                     {{ formatSize(file.size) }}
                   </td>
-                  <td class="py-3 px-5 text-[13px] text-slate-500">
+                  <td class="py-3 px-2 text-[13px] text-slate-500">
                     {{ timeAgo(file.createdAt) }}
                   </td>
-                  <td class="py-3 px-5">
-                    <div class="flex flex-wrap gap-1.5">
+                  <td class="py-3 px-2">
+                    <div class="flex items-center gap-1.5 whitespace-nowrap">
                       <span
-                        v-for="tag in getFileTags(file)"
+                        v-for="tag in getFileTags(file).slice(0, 1)"
                         :key="tag"
-                        class="px-2 py-0.5 rounded-[6px] text-[11px] font-bold"
+                        class="px-2 py-0.5 rounded-[6px] text-[11px] font-bold whitespace-nowrap"
                         :class="getTagColorClass(tag)"
                       >
                         {{ tag }}
                       </span>
+                      <span
+                        v-if="getFileTags(file).length > 1"
+                        class="px-1.5 py-0.5 rounded-[6px] text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-500 whitespace-nowrap border border-slate-200 dark:border-slate-700"
+                      >
+                        +{{ getFileTags(file).length - 1 }}
+                      </span>
                     </div>
                   </td>
-                  <td class="py-3 px-5 text-right">
+                  <td class="py-3 px-2 text-right">
                     <div class="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition">
+                      <button class="p-1.5 text-slate-400 hover:text-indigo-500 transition" @click.prevent.stop="openDetailsModal(file)" title="View Details">
+                        <UIcon name="i-lucide-eye" class="size-4" />
+                      </button>
                       <button class="p-1.5 text-slate-400 hover:text-amber-400 transition" @click.stop>
                         <UIcon name="i-lucide-star" class="size-4" />
                       </button>
@@ -703,5 +778,81 @@ const recentUploads = computed(() => {
       </div>
 
     </div>
+
+    <!-- File Details Modal -->
+    <UModal v-model:open="isDetailsModalOpen" :ui="{ wrapper: 'z-[100]', width: 'sm:max-w-md', rounded: 'rounded-[20px]', shadow: 'shadow-2xl', background: 'bg-white dark:bg-slate-900', ring: 'ring-1 ring-slate-200 dark:ring-slate-800', overlay: { background: 'bg-slate-900/40 backdrop-blur-[2px]' } }">
+      <template #content>
+      <div class="p-6 flex flex-col gap-6" v-if="modalFile">
+        <!-- Header -->
+        <div class="flex items-start justify-between">
+          <div class="flex gap-4 items-center">
+            <div class="size-[48px] rounded-[12px] flex items-center justify-center shrink-0 border border-slate-100 dark:border-slate-800" :class="getFileColorClass(modalFile.type)">
+              <UIcon :name="getFileIcon(modalFile.type)" class="size-[24px]" />
+            </div>
+            <div class="flex flex-col min-w-0 pr-4">
+              <h3 class="text-[16px] font-bold text-slate-900 dark:text-white truncate max-w-[250px]">{{ modalFile.originalName || modalFile.fileName }}</h3>
+              <p class="text-[13px] font-medium text-slate-500">{{ modalFile.courseId?.title || 'General' }}</p>
+            </div>
+          </div>
+          <button @click="isDetailsModalOpen = false" class="p-1.5 rounded-full text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-600 dark:hover:text-slate-300 transition">
+            <UIcon name="i-lucide-x" class="size-5" />
+          </button>
+        </div>
+
+        <!-- Details Grid -->
+        <div class="grid grid-cols-2 gap-4 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-[12px] border border-slate-100 dark:border-slate-800">
+          <div class="flex flex-col gap-1">
+            <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Type</span>
+            <span class="text-[13px] font-medium text-slate-900 dark:text-slate-200">{{ modalFile.type?.toUpperCase() || 'UNKNOWN' }}</span>
+          </div>
+          <div class="flex flex-col gap-1">
+            <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Size</span>
+            <span class="text-[13px] font-medium text-slate-900 dark:text-slate-200">{{ formatSize(modalFile.size) }}</span>
+          </div>
+          <div class="flex flex-col gap-1">
+            <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Uploaded</span>
+            <span class="text-[13px] font-medium text-slate-900 dark:text-slate-200">{{ new Date(modalFile.createdAt || Date.now()).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }) }}</span>
+          </div>
+          <div class="flex flex-col gap-1">
+            <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Status</span>
+            <span class="text-[13px] font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-1"><UIcon name="i-lucide-check-circle-2" class="size-3.5" /> {{ modalFile.status || 'Processed' }}</span>
+          </div>
+        </div>
+
+        <!-- Tags -->
+        <div v-if="getFileTags(modalFile).length > 0" class="flex flex-col gap-2">
+          <span class="text-[12px] font-bold text-slate-900 dark:text-white">Tags</span>
+          <div class="flex flex-wrap gap-2">
+            <span
+              v-for="tag in getFileTags(modalFile)"
+              :key="tag"
+              class="px-2.5 py-1 rounded-[6px] text-[12px] font-bold"
+              :class="getTagColorClass(tag)"
+            >
+              {{ tag }}
+            </span>
+          </div>
+        </div>
+
+        <!-- Summary / Description -->
+        <div v-if="modalFile.description || modalFile.aiSummary" class="flex flex-col gap-2">
+          <span class="text-[12px] font-bold text-slate-900 dark:text-white">Summary</span>
+          <p class="text-[13px] leading-relaxed text-slate-600 dark:text-slate-400 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-[10px] border border-slate-100 dark:border-slate-800">
+            {{ modalFile.aiSummary || modalFile.description }}
+          </p>
+        </div>
+
+        <!-- Actions -->
+        <div class="flex items-center gap-3 pt-2">
+          <button class="flex-1 py-2.5 rounded-[10px] bg-indigo-600 hover:bg-indigo-700 text-white text-[13px] font-bold transition flex justify-center items-center gap-2 shadow-sm">
+            Open File <UIcon name="i-lucide-external-link" class="size-4" />
+          </button>
+          <button class="flex-1 py-2.5 rounded-[10px] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-[13px] font-bold hover:bg-slate-50 dark:hover:bg-slate-700 transition flex justify-center items-center gap-2 shadow-sm">
+            Download <UIcon name="i-lucide-download" class="size-4" />
+          </button>
+        </div>
+      </div>
+      </template>
+    </UModal>
   </div>
 </template>
