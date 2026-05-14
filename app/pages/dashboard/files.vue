@@ -250,13 +250,13 @@ const recentUploads = computed(() => {
       <UIcon name="i-lucide-loader-2" class="size-8 animate-spin text-indigo-600" />
     </div>
 
-    <!-- Main Grid -->
-    <div v-else class="grid grid-cols-1 xl:grid-cols-[1fr_340px] 2xl:grid-cols-[1fr_340px] gap-6 items-start">
+    <!-- Content Area -->
+    <template v-else>
       
-      <!-- LEFT COLUMN -->
-      <div class="flex flex-col gap-5">
-
-        <!-- LEFT: Filters Row (independent of right column) -->
+      <!-- TOP CONTROLS GRID -->
+      <div class="grid grid-cols-1 xl:grid-cols-[1fr_340px] 2xl:grid-cols-[1fr_340px] gap-6">
+        
+        <!-- LEFT: Filters Row -->
         <div class="flex items-center justify-between gap-2">
 
           <!-- File Type Dropdown -->
@@ -343,8 +343,18 @@ const recentUploads = computed(() => {
           </div>
         </div>
         
-        <!-- Upload Dropzone -->
-        <div 
+        <!-- Right side empty to maintain alignment -->
+        <div class="hidden xl:block"></div>
+      </div>
+        
+      <!-- MAIN CONTENT GRID -->
+      <div class="grid grid-cols-1 xl:grid-cols-[1fr_340px] 2xl:grid-cols-[1fr_340px] gap-5 items-stretch">
+        
+        <!-- LEFT COLUMN -->
+        <div class="flex flex-col gap-5 h-full">
+
+          <!-- Upload Dropzone -->
+          <div 
           @click="uploadRef?.click()"
           class="flex flex-col items-center justify-center p-8 rounded-[16px] border-[1.5px] border-dashed border-indigo-200 dark:border-indigo-500/30 bg-white dark:bg-slate-900 cursor-pointer hover:bg-indigo-50/50 dark:hover:bg-indigo-500/10 transition-colors shadow-sm"
         >
@@ -477,8 +487,11 @@ const recentUploads = computed(() => {
                   </td>
                 </tr>
                 <tr v-if="filteredFiles.length === 0">
-                  <td colspan="6" class="py-10 text-center text-slate-500 text-[13px]">
-                    No files found matching your criteria.
+                  <td colspan="6" class="h-[285px] align-middle">
+                    <div class="flex flex-col items-center justify-center gap-1 text-slate-500 text-[13px]">
+                      <UIcon name="i-lucide-search-x" class="size-8 text-slate-300 dark:text-slate-600 mb-2" />
+                      <span>No files found matching your criteria.</span>
+                    </div>
                   </td>
                 </tr>
                 <!-- Filler rows to maintain table height on last page -->
@@ -531,9 +544,9 @@ const recentUploads = computed(() => {
         </div>
 
         <!-- Bottom Cards Row -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-auto">
           <!-- Storage Usage -->
-          <div class="bg-white dark:bg-slate-900 rounded-[16px] border border-slate-200 dark:border-slate-800 p-5 shadow-sm flex flex-col justify-between">
+          <div class="bg-white dark:bg-slate-900 rounded-[16px] border border-slate-200 dark:border-slate-800 p-5 shadow-sm flex flex-col justify-between h-full">
             <h4 class="text-[14px] font-bold text-slate-900 dark:text-white mb-4">Storage Usage</h4>
             <div class="flex gap-5 items-center mb-5">
                <!-- Circular progress -->
@@ -561,7 +574,7 @@ const recentUploads = computed(() => {
           </div>
 
           <!-- Recent Uploads -->
-          <div class="bg-white dark:bg-slate-900 rounded-[16px] border border-slate-200 dark:border-slate-800 p-5 shadow-sm flex flex-col">
+          <div class="bg-white dark:bg-slate-900 rounded-[16px] border border-slate-200 dark:border-slate-800 p-5 shadow-sm flex flex-col h-full">
             <div class="flex items-center justify-between mb-4">
               <h4 class="text-[14px] font-bold text-slate-900 dark:text-white">Recent Uploads</h4>
               <button class="text-[12px] font-bold text-indigo-600 hover:underline">View all</button>
@@ -581,7 +594,7 @@ const recentUploads = computed(() => {
           </div>
 
           <!-- AI Actions list -->
-          <div class="bg-white dark:bg-slate-900 rounded-[16px] border border-slate-200 dark:border-slate-800 p-5 shadow-sm flex flex-col">
+          <div class="bg-white dark:bg-slate-900 rounded-[16px] border border-slate-200 dark:border-slate-800 p-5 shadow-sm flex flex-col h-full">
             <h4 class="text-[14px] font-bold text-slate-900 dark:text-white mb-3">AI Actions</h4>
             <div class="flex flex-col gap-1.5 flex-1 justify-center">
               <div class="flex items-center justify-between p-2 rounded-[10px] hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer group transition">
@@ -638,7 +651,7 @@ const recentUploads = computed(() => {
       </div>
 
       <!-- RIGHT COLUMN (Sidebar Cards) -->
-      <div class="flex flex-col gap-6 w-full">
+      <div class="flex flex-col gap-5 w-full h-full">
         <template v-if="selectedFile">
           <!-- Selected File Card -->
           <div class="bg-white dark:bg-slate-900 rounded-[16px] border border-slate-200 dark:border-slate-800 p-5 shadow-sm relative">
@@ -734,37 +747,57 @@ const recentUploads = computed(() => {
           </div>
 
           <!-- Quick Actions -->
-          <div class="bg-white dark:bg-slate-900 rounded-[16px] border border-slate-200 dark:border-slate-800 p-5 shadow-sm">
+          <div class="bg-white dark:bg-slate-900 rounded-[16px] border border-slate-200 dark:border-slate-800 p-5 shadow-sm mt-auto">
             <h4 class="text-[14px] font-bold text-slate-900 dark:text-white mb-3">Quick Actions</h4>
-            <div class="space-y-1">
-              <button class="w-full flex items-center justify-between p-2.5 rounded-[10px] hover:bg-slate-50 dark:hover:bg-slate-800 transition text-left group">
+            <div class="flex flex-col gap-1.5 flex-1 justify-center">
+              <div class="flex items-center justify-between p-2 rounded-[10px] hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer group transition">
                 <div class="flex items-center gap-3">
-                  <UIcon name="i-lucide-layers" class="size-4 text-indigo-500" />
-                  <span class="text-[13px] font-bold text-slate-700 dark:text-slate-200">Generate flashcards</span>
+                  <div class="size-8 rounded-[8px] bg-indigo-50 dark:bg-indigo-500/10 flex items-center justify-center shrink-0">
+                    <UIcon name="i-lucide-layers" class="size-[18px] text-indigo-600" />
+                  </div>
+                  <div>
+                    <div class="text-[13px] font-bold text-slate-900 dark:text-white mb-0.5">Generate flashcards</div>
+                    <div class="text-[11px] text-slate-500 font-medium">Create study flashcards</div>
+                  </div>
                 </div>
                 <UIcon name="i-lucide-chevron-right" class="size-4 text-slate-300 group-hover:text-slate-500 transition" />
-              </button>
-              <button class="w-full flex items-center justify-between p-2.5 rounded-[10px] hover:bg-slate-50 dark:hover:bg-slate-800 transition text-left group">
+              </div>
+              <div class="flex items-center justify-between p-2 rounded-[10px] hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer group transition">
                 <div class="flex items-center gap-3">
-                  <UIcon name="i-lucide-file-question" class="size-4 text-blue-500" />
-                  <span class="text-[13px] font-bold text-slate-700 dark:text-slate-200">Create exercises</span>
+                  <div class="size-8 rounded-[8px] bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center shrink-0">
+                    <UIcon name="i-lucide-file-question" class="size-[18px] text-blue-600" />
+                  </div>
+                  <div>
+                    <div class="text-[13px] font-bold text-slate-900 dark:text-white mb-0.5">Create exercises</div>
+                    <div class="text-[11px] text-slate-500 font-medium">Generate practice questions</div>
+                  </div>
                 </div>
                 <UIcon name="i-lucide-chevron-right" class="size-4 text-slate-300 group-hover:text-slate-500 transition" />
-              </button>
-              <button class="w-full flex items-center justify-between p-2.5 rounded-[10px] hover:bg-slate-50 dark:hover:bg-slate-800 transition text-left group">
+              </div>
+              <div class="flex items-center justify-between p-2 rounded-[10px] hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer group transition">
                 <div class="flex items-center gap-3">
-                  <UIcon name="i-lucide-crosshair" class="size-4 text-emerald-500" />
-                  <span class="text-[13px] font-bold text-slate-700 dark:text-slate-200">Extract key points</span>
+                  <div class="size-8 rounded-[8px] bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center shrink-0">
+                    <UIcon name="i-lucide-crosshair" class="size-[18px] text-emerald-600" />
+                  </div>
+                  <div>
+                    <div class="text-[13px] font-bold text-slate-900 dark:text-white mb-0.5">Extract key points</div>
+                    <div class="text-[11px] text-slate-500 font-medium">Find important information</div>
+                  </div>
                 </div>
                 <UIcon name="i-lucide-chevron-right" class="size-4 text-slate-300 group-hover:text-slate-500 transition" />
-              </button>
-              <button class="w-full flex items-center justify-between p-2.5 rounded-[10px] hover:bg-slate-50 dark:hover:bg-slate-800 transition text-left group">
+              </div>
+              <div class="flex items-center justify-between p-2 rounded-[10px] hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer group transition">
                 <div class="flex items-center gap-3">
-                  <UIcon name="i-lucide-search" class="size-4 text-slate-400" />
-                  <span class="text-[13px] font-bold text-slate-700 dark:text-slate-200">Find similar files</span>
+                  <div class="size-8 rounded-[8px] bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0">
+                    <UIcon name="i-lucide-search" class="size-[18px] text-slate-600 dark:text-slate-400" />
+                  </div>
+                  <div>
+                    <div class="text-[13px] font-bold text-slate-900 dark:text-white mb-0.5">Find similar files</div>
+                    <div class="text-[11px] text-slate-500 font-medium">Discover related content</div>
+                  </div>
                 </div>
                 <UIcon name="i-lucide-chevron-right" class="size-4 text-slate-300 group-hover:text-slate-500 transition" />
-              </button>
+              </div>
             </div>
           </div>
         </template>
@@ -778,8 +811,9 @@ const recentUploads = computed(() => {
       </div>
 
     </div>
+  </template>
 
-    <!-- File Details Modal -->
+  <!-- File Details Modal -->
     <UModal v-model:open="isDetailsModalOpen" :ui="{ wrapper: 'z-[100]', width: 'sm:max-w-md', rounded: 'rounded-[20px]', shadow: 'shadow-2xl', background: 'bg-white dark:bg-slate-900', ring: 'ring-1 ring-slate-200 dark:ring-slate-800', overlay: { background: 'bg-slate-900/40 backdrop-blur-[2px]' } }">
       <template #content>
       <div class="p-6 flex flex-col gap-6" v-if="modalFile">
