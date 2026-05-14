@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 
 definePageMeta({ layout: 'dashboard' })
 const { get, post } = useApi()
@@ -103,6 +103,20 @@ const filteredFiles = computed(() => {
   }
 
   return result
+})
+
+const currentPage = ref(1)
+const ITEMS_PER_PAGE = 5
+
+watch([activeTab, selectedFolder], () => {
+  currentPage.value = 1
+})
+
+const totalPages = computed(() => Math.ceil(filteredFiles.value.length / ITEMS_PER_PAGE))
+
+const paginatedFiles = computed(() => {
+  const start = (currentPage.value - 1) * ITEMS_PER_PAGE
+  return filteredFiles.value.slice(start, start + ITEMS_PER_PAGE)
 })
 
 const getFolderFileCount = (folderId: string) => {
@@ -339,8 +353,8 @@ const recentUploads = computed(() => {
               </thead>
               <tbody>
                 <tr
-                  v-for="file in filteredFiles.slice(0, 8)"
-                  :key="file._id"
+                  v-for="(file, index) in paginatedFiles"
+                  :key="file._id || index"
                   @click="selectedFile = file"
                   class="group border-b border-slate-50 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition"
                   :class="{ 'bg-indigo-50/30 dark:bg-indigo-500/5': selectedFile?._id === file._id }"
@@ -392,20 +406,51 @@ const recentUploads = computed(() => {
                     No files found matching your criteria.
                   </td>
                 </tr>
+                <!-- Filler rows to maintain table height on last page -->
+                <tr 
+                  v-for="i in (filteredFiles.length > 0 ? Math.max(0, ITEMS_PER_PAGE - paginatedFiles.length) : 0)" 
+                  :key="'empty-' + i" 
+                  class="border-b border-transparent"
+                >
+                  <td colspan="6" class="py-3 px-5 h-[57px]"></td>
+                </tr>
               </tbody>
             </table>
           </div>
           <!-- Pagination -->
-          <div class="flex items-center justify-between p-4 border-t border-slate-100 dark:border-slate-800/50">
-            <span class="text-[12px] text-slate-500 font-medium">Showing 1 to {{ Math.min(8, filteredFiles.length) }} of {{ filteredFiles.length }} files</span>
+          <div v-if="filteredFiles.length > ITEMS_PER_PAGE" class="flex items-center justify-between p-4 border-t border-slate-100 dark:border-slate-800/50">
+            <span class="text-[12px] text-slate-500 font-medium">
+              Showing {{ (currentPage - 1) * ITEMS_PER_PAGE + 1 }} to {{ Math.min(currentPage * ITEMS_PER_PAGE, filteredFiles.length) }} of {{ filteredFiles.length }} files
+            </span>
             <div class="flex items-center gap-1.5">
-              <button class="size-7 flex items-center justify-center rounded-[6px] border border-slate-200 dark:border-slate-700 text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition"><UIcon name="i-lucide-chevron-left" class="size-4" /></button>
-              <button class="size-7 flex items-center justify-center rounded-[6px] bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 border border-indigo-100 dark:border-indigo-500/20 text-[12px] font-bold">1</button>
-              <button class="size-7 flex items-center justify-center rounded-[6px] text-slate-600 dark:text-slate-300 text-[12px] font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition">2</button>
-              <button class="size-7 flex items-center justify-center rounded-[6px] text-slate-600 dark:text-slate-300 text-[12px] font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition">3</button>
-              <span class="text-slate-400 text-[12px] px-1">...</span>
-              <button class="size-7 flex items-center justify-center rounded-[6px] text-slate-600 dark:text-slate-300 text-[12px] font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition">{{ Math.ceil((total||1)/8) > 3 ? Math.ceil((total||1)/8) : 13 }}</button>
-              <button class="size-7 flex items-center justify-center rounded-[6px] border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition"><UIcon name="i-lucide-chevron-right" class="size-4" /></button>
+              <button 
+                @click="currentPage > 1 && currentPage--" 
+                :disabled="currentPage === 1"
+                class="size-7 flex items-center justify-center rounded-[6px] border border-slate-200 dark:border-slate-700 text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition disabled:opacity-50"
+              >
+                <UIcon name="i-lucide-chevron-left" class="size-4" />
+              </button>
+              
+              <template v-for="p in totalPages" :key="p">
+                <button 
+                  v-if="p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1"
+                  @click="currentPage = p"
+                  class="size-7 flex items-center justify-center rounded-[6px] text-[12px] transition"
+                  :class="currentPage === p ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 border border-indigo-100 dark:border-indigo-500/20 font-bold' : 'text-slate-600 dark:text-slate-300 font-medium hover:bg-slate-50 dark:hover:bg-slate-800'"
+                >
+                  {{ p }}
+                </button>
+                <span v-else-if="p === 2 && currentPage > 3" class="text-slate-400 text-[12px] px-1">...</span>
+                <span v-else-if="p === totalPages - 1 && currentPage < totalPages - 2" class="text-slate-400 text-[12px] px-1">...</span>
+              </template>
+
+              <button 
+                @click="currentPage < totalPages && currentPage++"
+                :disabled="currentPage === totalPages"
+                class="size-7 flex items-center justify-center rounded-[6px] border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition disabled:opacity-50"
+              >
+                <UIcon name="i-lucide-chevron-right" class="size-4" />
+              </button>
             </div>
           </div>
         </div>
