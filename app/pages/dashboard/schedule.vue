@@ -184,6 +184,8 @@ const regenerate = async () => {
     {id:6,icon:'i-lucide-zap',title:'Focus Block Friday',desc:'Block Fri 14:00–16:00 for deep study.',applied:false},
   ]; isRegen.value=false
 }
+
+import ScheduleInsightsGrid from '~/components/schedule/ScheduleInsightsGrid.vue'
 </script>
 
 <template>
@@ -471,6 +473,9 @@ const regenerate = async () => {
         </div>
       </div>
     </div>
+
+    <!-- Bottom Analytics Section -->
+    <ScheduleInsightsGrid :events="filtered" />
 
     <!-- Quick Add Modal -->
     <div v-if="showQuickAdd" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" @click.self="showQuickAdd=false">
