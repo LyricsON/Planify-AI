@@ -1,578 +1,2444 @@
 <script setup lang="ts">
-import BoardColumn from '~/components/tasks/BoardColumn.vue'
 definePageMeta({ layout: 'dashboard' })
 
-const { get, post, put } = useApi()
-const route = useRoute()
-const router = useRouter()
-
-type TaskStatus = 'todo' | 'in_progress' | 'completed'
-type Priority = 'low' | 'medium' | 'high'
-
-const tasks = ref<any[]>([])
-const exams = ref<any[]>([])
-const courses = ref<any[]>([])
-const isLoading = ref(true)
-
-const activeTab = ref<'overview' | 'exams' | 'tasks'>('overview')
-const taskFilter = ref<'all' | TaskStatus>('all')
-const showAddTask = ref(false)
-const newTask = ref({ title: '', priority: 'medium', deadline: '', courseId: '', description: '' })
-
-const selectedCourse = ref('all')
-const selectedType = ref<'all' | Priority>('all')
-const sortBy = ref<'due' | 'priority'>('due')
-
-const fallbackCourses = [
-  { _id: 'course-cs-201', title: 'CS 201' },
-  { _id: 'course-math-101', title: 'Math 101' },
-  { _id: 'course-physics-101', title: 'Physics 101' },
-  { _id: 'course-db', title: 'Database Systems' }
-]
-
-function inDays(days: number) {
-  const d = new Date()
-  d.setDate(d.getDate() + days)
-  return d.toISOString()
+// ── Types ─────────────────────────────────────────────────────────────────────
+interface Task {
+  _id: string
+  title: string
+  description?: string
+  courseId?: string | { _id: string; title: string }
+  priority: 'low' | 'medium' | 'high'
+  status: 'todo' | 'in_progress' | 'review' | 'completed'
+  deadline?: string
+  estimatedDuration?: number
+  createdAt?: string
+  updatedAt?: string
 }
 
-const fallbackTasks = [
-  { _id: 't-1', title: 'Revise Thermodynamics', priority: 'high', status: 'todo', deadline: inDays(0), courseId: 'course-physics-101' },
-  { _id: 't-2', title: 'Solve Dynamic Programming Problems', priority: 'high', status: 'todo', deadline: inDays(1), courseId: 'course-cs-201' },
-  { _id: 't-3', title: 'Practice Integrals', priority: 'medium', status: 'todo', deadline: inDays(2), courseId: 'course-math-101' },
-  { _id: 't-4', title: 'Read Chapter 5: Normalization', priority: 'low', status: 'todo', deadline: inDays(3), courseId: 'course-db' },
-  { _id: 't-5', title: 'Data Structures Lab Report', priority: 'medium', status: 'in_progress', deadline: inDays(3), courseId: 'course-cs-201' },
-  { _id: 't-6', title: 'Limits and Continuity Notes', priority: 'medium', status: 'in_progress', deadline: inDays(4), courseId: 'course-math-101' },
-  { _id: 't-7', title: 'Algorithm Analysis Summary', priority: 'low', status: 'in_progress', deadline: inDays(6), courseId: 'course-cs-201' },
-  { _id: 't-8', title: 'SQL Joins Worksheet', priority: 'low', status: 'completed', deadline: inDays(-1), courseId: 'course-db', updatedAt: inDays(-1) },
-  { _id: 't-9', title: 'Vectors and Matrices Quiz Prep', priority: 'medium', status: 'completed', deadline: inDays(-2), courseId: 'course-math-101', updatedAt: inDays(-2) },
-  { _id: 't-10', title: 'Newton Laws Summary', priority: 'high', status: 'completed', deadline: inDays(-3), courseId: 'course-physics-101', updatedAt: inDays(-3) }
-]
+interface Course {
+  _id: string
+  title: string
+}
 
-const fallbackExams = [
-  { _id: 'e-1', title: 'Physics TD', examDate: inDays(2), courseId: 'course-physics-101' },
-  { _id: 'e-2', title: 'Data Structures', examDate: inDays(4), courseId: 'course-cs-201' },
-  { _id: 'e-3', title: 'Calculus Exam', examDate: inDays(7), courseId: 'course-math-101' },
-  { _id: 'e-4', title: 'Database Systems', examDate: inDays(9), courseId: 'course-db' },
-  { _id: 'e-5', title: 'Linear Algebra', examDate: inDays(14), courseId: 'course-math-101' }
-]
+interface Schedule {
+  _id: string
+  title: string
+  start: string
+  end: string
+  type: string
+  location?: string
+  courseId?: string | { _id: string; title: string }
+}
 
-const mapCourse = computed(() => {
+// ── Composables ───────────────────────────────────────────────────────────────
+const { get, post, put, del } = useApi()
+const router = useRouter()
+
+// ── State ─────────────────────────────────────────────────────────────────────
+const tasks = ref<Task[]>([])
+const courses = ref<Course[]>([])
+const schedules = ref<Schedule[]>([])
+const isLoading = ref(true)
+const loadError = ref('')
+
+// Filter / search
+const searchQuery = ref('')
+const activeTab = ref<'all' | 'upcoming' | 'in_progress' | 'completed' | 'high_priority'>('all')
+const sortBy = ref<'priority' | 'deadline' | 'newest' | 'oldest'>('priority')
+const viewMode = ref<'board' | 'list'>('board')
+
+// Modal state
+const showModal = ref(false)
+const modalMode = ref<'add' | 'edit'>('add')
+const modalPresetStatus = ref<Task['status']>('todo')
+const isSubmitting = ref(false)
+const submitError = ref('')
+const showDeleteConfirm = ref(false)
+const deleteTargetId = ref('')
+
+const form = ref({
+  _id: '',
+  title: '',
+  description: '',
+  courseId: '',
+  status: 'todo' as Task['status'],
+  priority: 'medium' as Task['priority'],
+  deadline: '',
+  estimatedDuration: 0
+})
+
+// ── Response parser ────────────────────────────────────────────────────
+// The backend paginates and spreads: { success, data: [...], total, count, page, pages }
+// normalizeResponse in useApi wraps the whole body as `apiRes.data`.
+// So apiRes.data might be:
+//   (a) the raw array  → if the response was just an array
+//   (b) an object with a `data` key → paginated
+function extractArray(apiRes: any): any[] {
+  if (!apiRes || !apiRes.success) return []
+  const d = apiRes.data
+  if (Array.isArray(d)) return d
+  if (d && Array.isArray(d.data)) return d.data
+  return []
+}
+
+// ── Data Loading ──────────────────────────────────────────────────────
+async function loadData() {
+  loadError.value = ''
+  isLoading.value = true
+
+  // Guard: must be authenticated
+  if (import.meta.client) {
+    const token = localStorage.getItem('accessToken') || localStorage.getItem('planify_token')
+    if (!token) {
+      loadError.value = 'You are not signed in. Please sign in to view your tasks.'
+      isLoading.value = false
+      return
+    }
+  }
+
+  try {
+    const todayStart = new Date()
+    todayStart.setHours(0, 0, 0, 0)
+    const todayEnd = new Date()
+    todayEnd.setHours(23, 59, 59, 999)
+
+    const [tRes, cRes, sRes] = await Promise.all([
+      get<any>('/tasks', { limit: 100 }),
+      get<any>('/courses', { limit: 100 }),
+      get<any>('/schedules', {
+        start: todayStart.toISOString(),
+        end: todayEnd.toISOString(),
+        limit: 100
+      })
+    ])
+
+    // Handle 401 — token expired / invalid
+    if (tRes.statusCode === 401 || cRes.statusCode === 401) {
+      loadError.value = 'Session expired. Please sign in again.'
+      isLoading.value = false
+      return
+    }
+
+    if (!tRes.success) {
+      loadError.value = tRes.message || 'Failed to load tasks. Is the backend running on port 5000?'
+      isLoading.value = false
+      return
+    }
+
+    tasks.value = extractArray(tRes)
+    courses.value = extractArray(cRes)
+    schedules.value = extractArray(sRes)
+  } catch (e: any) {
+    loadError.value = e?.message || 'Unexpected error loading tasks.'
+    console.error('[Tasks] loadData error:', e)
+  } finally {
+    isLoading.value = false
+  }
+}
+
+
+onMounted(loadData)
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+const courseMap = computed(() => {
   const m = new Map<string, string>()
   courses.value.forEach(c => m.set(c._id, c.title))
   return m
 })
 
-const allTasks = computed(() => tasks.value.map(t => ({ ...t, courseTitle: courseTitleOf(t.courseId) })))
-const allExams = computed(() => exams.value.map(e => ({ ...e, courseTitle: courseTitleOf(e.courseId) })))
-
-const filteredTasks = computed(() => {
-  const base = allTasks.value.filter(t => taskFilter.value === 'all' || t.status === taskFilter.value)
-  return applyGlobalFilters(base).sort(taskSorter)
-})
-
-const upcomingExams = computed(() => allExams.value
-  .filter(e => new Date(e.examDate).getTime() >= Date.now())
-  .sort((a, b) => new Date(a.examDate).getTime() - new Date(b.examDate).getTime()))
-
-const filteredUpcomingExams = computed(() => applyGlobalFilters(upcomingExams.value))
-const topUpcomingExams = computed(() => filteredUpcomingExams.value.slice(0, 5))
-const overdueTasks = computed(() => allTasks.value.filter(t => t.deadline && new Date(t.deadline) < new Date() && t.status !== 'completed'))
-
-const stats = computed(() => ({
-  total: allTasks.value.length,
-  completed: allTasks.value.filter(t => t.status === 'completed').length,
-  inProgress: allTasks.value.filter(t => t.status === 'in_progress').length,
-  overdue: overdueTasks.value.length
-}))
-
-const boardColumns = computed(() => {
-  const list = applyGlobalFilters(allTasks.value)
-  return {
-    high: list.filter(t => t.status !== 'completed' && t.priority === 'high').sort(taskSorter),
-    progress: list.filter(t => t.status === 'in_progress').sort(taskSorter),
-    completed: list.filter(t => t.status === 'completed').sort((a, b) => new Date(b.updatedAt || b.deadline || 0).getTime() - new Date(a.updatedAt || a.deadline || 0).getTime())
-  }
-})
-
-const totalTrackable = computed(() => stats.value.total || 1)
-const completionPct = computed(() => Math.round((stats.value.completed / totalTrackable.value) * 100))
-
-const tasksByCourse = computed(() => {
-  const grouped = new Map<string, number>()
-  allTasks.value.forEach((t) => {
-    const key = t.courseTitle || 'General'
-    grouped.set(key, (grouped.get(key) || 0) + 1)
-  })
-  return [...grouped.entries()].map(([name, count]) => ({ name, count, pct: Math.round((count / (stats.value.total || 1)) * 100) }))
-})
-
-const activityFeed = computed(() => {
-  const taskEvents = allTasks.value.slice(0, 12).map(t => ({
-    id: `task-${t._id}`,
-    title: t.status === 'completed' ? `Completed "${t.title}"` : `Updated task "${t.title}"`,
-    subtitle: `${t.courseTitle || 'General'} • ${formatShortDate(t.updatedAt || t.createdAt || t.deadline)}`,
-    time: new Date(t.updatedAt || t.createdAt || t.deadline || 0).getTime()
-  }))
-  const examEvents = allExams.value.slice(0, 6).map(e => ({
-    id: `exam-${e._id}`,
-    title: `Exam scheduled: "${e.title}"`,
-    subtitle: `${e.courseTitle || 'Course'} • ${formatShortDate(e.examDate)}`,
-    time: new Date(e.examDate).getTime()
-  }))
-  return [...taskEvents, ...examEvents].sort((a, b) => b.time - a.time).slice(0, 4)
-})
-
-const checklist = computed(() => ([
-  { key: 'formula', label: 'Review formula sheet', done: stats.value.completed >= 2 },
-  { key: 'flashcards', label: 'Flashcards - Physics', done: stats.value.completed >= 3 },
-  { key: 'past', label: 'Solve 10 past questions', done: stats.value.inProgress >= 2 },
-  { key: 'notes', label: 'Read lecture notes', done: stats.value.overdue === 0 && stats.value.total > 0 },
-  { key: 'summary', label: 'Summarize key concepts', done: stats.value.completed >= 6 }
-]))
-
-const checklistDone = computed(() => checklist.value.filter(i => i.done).length)
-
-const aiPriorities = computed(() => {
-  const ranked = applyGlobalFilters(allTasks.value)
-    .filter(t => t.status !== 'completed')
-    .sort((a, b) => {
-      const pa = priorityWeight(b.priority) - priorityWeight(a.priority)
-      if (pa !== 0) return pa
-      return new Date(a.deadline || 0).getTime() - new Date(b.deadline || 0).getTime()
-    })
-    .slice(0, 5)
-
-  return ranked.map((t, idx) => ({
-    index: idx + 1,
-    title: t.title,
-    course: t.courseTitle,
-    impact: t.priority === 'high' ? 'High Impact' : t.priority === 'medium' ? 'Medium Impact' : 'Low Impact',
-    impactTone: t.priority === 'high' ? 'text-red-500' : t.priority === 'medium' ? 'text-amber-500' : 'text-emerald-500'
-  }))
-})
-
-function applyGlobalFilters<T extends { courseId?: any, priority?: any }>(rows: T[]) {
-  return rows.filter((row) => {
-    const c = selectedCourse.value === 'all' || normalizeCourseId(row.courseId) === selectedCourse.value
-    const p = selectedType.value === 'all' || row.priority === selectedType.value
-    return c && p
-  })
+function courseTitleOf(courseId: string | { _id: string; title: string } | undefined): string {
+  if (!courseId) return ''
+  if (typeof courseId === 'object' && courseId.title) return courseId.title
+  return courseMap.value.get(courseId as string) || ''
 }
 
-function taskSorter(a: any, b: any) {
-  if (sortBy.value === 'priority') return priorityWeight(b.priority) - priorityWeight(a.priority)
-  return new Date(a.deadline || 0).getTime() - new Date(b.deadline || 0).getTime()
+function normalizeCourseId(courseId: string | { _id: string; title: string } | undefined): string {
+  if (!courseId) return ''
+  if (typeof courseId === 'object') return courseId._id
+  return courseId
 }
 
-function priorityWeight(p: Priority) {
+function priorityWeight(p: string): number {
   if (p === 'high') return 3
   if (p === 'medium') return 2
   return 1
 }
 
-function normalizeCourseId(course: any) {
-  if (!course) return ''
-  if (typeof course === 'string') return course
-  return course._id || ''
+function formatDeadline(d?: string): string {
+  if (!d) return ''
+  return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
 }
 
-function courseTitleOf(course: any) {
-  if (!course) return 'General'
-  if (typeof course === 'object' && course.title) return course.title
-  return mapCourse.value.get(course) || 'General'
+function formatDuration(mins?: number): string {
+  if (!mins) return ''
+  const h = Math.floor(mins / 60)
+  const m = mins % 60
+  if (h > 0 && m > 0) return `${h}h ${m}m`
+  if (h > 0) return `${h}h`
+  return `${m}m`
 }
 
-function daysUntil(dateIso: string) {
-  const diff = Math.ceil((new Date(dateIso).getTime() - Date.now()) / 86400000)
-  if (diff <= 0) return diff === 0 ? 'Due today' : `Overdue ${Math.abs(diff)}d`
-  if (diff === 1) return 'Due tomorrow'
+function relativeTime(dateStr?: string): string {
+  if (!dateStr) return ''
+  const diff = Date.now() - new Date(dateStr).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 60) return `${mins}m ago`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.floor(hours / 24)
+  if (days === 1) return 'Yesterday'
+  return `${days}d ago`
+}
+
+function daysUntilLabel(d?: string): string {
+  if (!d) return ''
+  const diff = Math.ceil((new Date(d).getTime() - Date.now()) / 86400000)
+  if (diff < 0) return `Overdue`
+  if (diff === 0) return 'Due today'
+  if (diff === 1) return 'In 1 day'
   return `In ${diff} days`
 }
 
-function shortCourse(title: string) {
-  return title.length <= 14 ? title : `${title.slice(0, 14)}...`
+function daysUntilClass(d?: string): string {
+  if (!d) return 'due-neutral'
+  const diff = Math.ceil((new Date(d).getTime() - Date.now()) / 86400000)
+  if (diff < 0) return 'due-overdue'
+  if (diff <= 2) return 'due-soon'
+  return 'due-ok'
 }
 
-function formatShortDate(v?: string) {
-  if (!v) return '-'
-  return new Date(v).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+function scheduleTimeLabel(ev: Schedule): string {
+  const s = new Date(ev.start)
+  const e = new Date(ev.end)
+  const fmt = (d: Date) => d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  return `${fmt(s)} – ${fmt(e)}`
 }
 
-function examAccent(i: number) {
-  const accents = ['#14b86a', '#ff3b3b', '#5a5cff', '#5a5cff', '#f59e0b']
-  return accents[i % accents.length]
+function scheduleCourseName(ev: Schedule): string {
+  if (!ev.courseId) return ev.location || ''
+  if (typeof ev.courseId === 'object' && ev.courseId.title) return ev.courseId.title
+  return courseMap.value.get(ev.courseId as string) || ev.location || ''
 }
 
-function examTime(i: number) {
-  const times = ['14:00', '10:00', '09:00', '13:00', '11:00']
-  return times[i % times.length]
+// ── Stats ─────────────────────────────────────────────────────────────────────
+const stats = computed(() => {
+  const total = tasks.value.length
+  const completed = tasks.value.filter(t => t.status === 'completed').length
+  const overdue = tasks.value.filter(t => {
+    if (!t.deadline || t.status === 'completed') return false
+    return new Date(t.deadline) < new Date()
+  }).length
+
+  // tasks created this week
+  const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7)
+  const thisWeek = tasks.value.filter(t => t.createdAt && new Date(t.createdAt) >= weekAgo).length
+
+  // Today's priorities: high priority + due today, or just high priority active
+  const today = new Date(); today.setHours(23, 59, 59, 999)
+  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
+  const todayHighPri = tasks.value.filter(t => {
+    if (t.status === 'completed' || t.priority !== 'high') return false
+    if (!t.deadline) return false
+    const d = new Date(t.deadline)
+    return d >= todayStart && d <= today
+  }).length
+
+  const totalHighPri = tasks.value.filter(t =>
+    t.status !== 'completed' && t.priority === 'high'
+  ).length
+
+  const completionPct = total > 0 ? Math.round((completed / total) * 100) : 0
+
+  return { total, completed, overdue, thisWeek, completionPct, todayPriorities: todayHighPri || totalHighPri }
+})
+
+// ── Status counts for donut ───────────────────────────────────────────────────
+const statusCounts = computed(() => {
+  const completed = tasks.value.filter(t => t.status === 'completed').length
+  const inProgress = tasks.value.filter(t => t.status === 'in_progress').length
+  const todo = tasks.value.filter(t => t.status === 'todo').length
+  const review = tasks.value.filter(t => t.status === 'review').length
+  const total = tasks.value.length || 1
+  return { completed, inProgress, todo, review, total }
+})
+
+// SVG Donut helpers
+const DONUT_R = 54
+const DONUT_CIRC = 2 * Math.PI * DONUT_R
+
+function donutOffset(pct: number, startPct: number): string {
+  const filled = (pct / 100) * DONUT_CIRC
+  const offset = DONUT_CIRC - filled
+  const rotation = startPct * 3.6 // 3.6deg per percent
+  return `${offset}`
 }
 
-function examChipClass(i: number) {
-  const chips = [
-    'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
-    'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
-    'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
-    'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
-    'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
+function donutRotation(startPct: number): string {
+  return `rotate(${startPct * 3.6 - 90}, 64, 64)`
+}
+
+const donutSegments = computed(() => {
+  const { completed, inProgress, todo, review, total } = statusCounts.value
+  const segments = [
+    { label: 'Completed', count: completed, pct: Math.round((completed / total) * 100), color: 'var(--color-success)' },
+    { label: 'In Progress', count: inProgress, pct: Math.round((inProgress / total) * 100), color: 'var(--color-warning)' },
+    { label: 'To Do', count: todo, pct: Math.round((todo / total) * 100), color: 'var(--color-primary)' },
+    { label: 'Review', count: review, pct: Math.round((review / total) * 100), color: 'var(--color-ai)' }
   ]
-  return chips[i % chips.length]
-}
-
-function tabClass(tab: string) {
-  return activeTab.value === tab
-    ? 'text-[var(--color-primary)] border-b-2 border-[var(--color-primary)]'
-    : 'text-[var(--color-text-muted)] hover:text-[var(--color-text)]'
-}
-
-function setTab(tab: 'overview' | 'exams' | 'tasks') {
-  router.replace({ query: { ...route.query, tab } })
-}
-
-function toneBadge(priority: Priority) {
-  if (priority === 'high') return 'bg-red-50 text-red-500 border-red-200 dark:bg-red-950/30 dark:text-red-300 dark:border-red-800'
-  if (priority === 'medium') return 'bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-800'
-  return 'bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-800'
-}
-
-function syncTabFromQuery() {
-  const q = String(route.query.tab || '')
-  if (q === 'tasks' || q === 'exams' || q === 'overview') activeTab.value = q
-}
-
-const isUnifiedExamsTasksMode = computed(() => {
-  const q = String(route.query.tab || '')
-  return q === 'overview' || q === 'exams' || q === 'tasks'
+  let cumPct = 0
+  return segments.map(s => {
+    const seg = { ...s, startPct: cumPct }
+    cumPct += s.pct
+    return seg
+  })
 })
 
-async function load() {
-  isLoading.value = true
-  const [tR, eR, cR] = await Promise.all([get<any>('/tasks'), get<any>('/exams'), get<any>('/courses')])
-  const incomingTasks = tR.success ? (Array.isArray(tR.data) ? tR.data : tR.data?.data || []) : []
-  const incomingExams = eR.success ? (Array.isArray(eR.data) ? eR.data : eR.data?.data || []) : []
-  const incomingCourses = cR.success ? (Array.isArray(cR.data) ? cR.data : cR.data?.data || []) : []
+// ── Filtering & Sorting ───────────────────────────────────────────────────────
+const enrichedTasks = computed(() =>
+  tasks.value.map(t => ({
+    ...t,
+    courseTitle: courseTitleOf(t.courseId),
+    courseIdNorm: normalizeCourseId(t.courseId)
+  }))
+)
 
-  courses.value = incomingCourses.length ? incomingCourses : fallbackCourses
-  tasks.value = incomingTasks.length ? incomingTasks : fallbackTasks
-  exams.value = incomingExams.length ? incomingExams : fallbackExams
-  isLoading.value = false
+function matchesSearch(t: typeof enrichedTasks.value[0]): boolean {
+  if (!searchQuery.value.trim()) return true
+  const q = searchQuery.value.toLowerCase()
+  return (
+    t.title.toLowerCase().includes(q) ||
+    (t.description || '').toLowerCase().includes(q) ||
+    t.courseTitle.toLowerCase().includes(q)
+  )
 }
 
-async function toggleTask(task: any) {
-  const newStatus: TaskStatus = task.status === 'completed' ? 'todo' : 'completed'
-  if (!String(task._id).startsWith('t-')) await put(`/tasks/${task._id}`, { status: newStatus })
-  task.status = newStatus
-  task.updatedAt = new Date().toISOString()
-}
-
-async function addTask() {
-  if (!newTask.value.title.trim()) return
-
-  const payload = { ...newTask.value }
-  if (tasks.value.some(t => String(t._id).startsWith('t-'))) {
-    tasks.value.unshift({
-      _id: `t-${Math.random().toString(36).slice(2, 9)}`,
-      title: payload.title,
-      priority: payload.priority,
-      deadline: payload.deadline || undefined,
-      status: 'todo',
-      courseId: payload.courseId || undefined,
-      description: payload.description,
-      createdAt: new Date().toISOString()
-    })
-  } else {
-    await post('/tasks', payload)
-    await load()
+function matchesTab(t: typeof enrichedTasks.value[0]): boolean {
+  const now = new Date()
+  switch (activeTab.value) {
+    case 'upcoming':
+      return t.status !== 'completed' && !!t.deadline && new Date(t.deadline) > now
+    case 'in_progress':
+      return t.status === 'in_progress'
+    case 'completed':
+      return t.status === 'completed'
+    case 'high_priority':
+      return t.priority === 'high' && t.status !== 'completed'
+    default:
+      return true
   }
-
-  showAddTask.value = false
-  newTask.value = { title: '', priority: 'medium', deadline: '', courseId: '', description: '' }
 }
 
-onMounted(() => {
-  syncTabFromQuery()
-  load()
+function sortTasks(a: any, b: any): number {
+  switch (sortBy.value) {
+    case 'priority':
+      return priorityWeight(b.priority) - priorityWeight(a.priority)
+    case 'deadline':
+      return (new Date(a.deadline || 0).getTime()) - (new Date(b.deadline || 0).getTime())
+    case 'newest':
+      return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+    case 'oldest':
+      return new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime()
+  }
+}
+
+const filteredTasks = computed(() =>
+  enrichedTasks.value
+    .filter(t => matchesSearch(t) && matchesTab(t))
+    .sort(sortTasks)
+)
+
+// ── Kanban columns ────────────────────────────────────────────────────────────
+const kanbanColumns = computed(() => [
+  {
+    id: 'todo',
+    label: 'To Do',
+    status: 'todo' as const,
+    accent: 'var(--color-primary)',
+    accentSoft: 'color-mix(in srgb, var(--color-primary) 8%, transparent)',
+    tasks: filteredTasks.value.filter(t => t.status === 'todo')
+  },
+  {
+    id: 'in_progress',
+    label: 'In Progress',
+    status: 'in_progress' as const,
+    accent: 'var(--color-warning)',
+    accentSoft: 'color-mix(in srgb, var(--color-warning) 8%, transparent)',
+    tasks: filteredTasks.value.filter(t => t.status === 'in_progress')
+  },
+  {
+    id: 'review',
+    label: 'Review',
+    status: 'review' as const,
+    accent: 'var(--color-ai)',
+    accentSoft: 'color-mix(in srgb, var(--color-ai) 8%, transparent)',
+    tasks: filteredTasks.value.filter(t => t.status === 'review')
+  },
+  {
+    id: 'completed',
+    label: 'Completed',
+    status: 'completed' as const,
+    accent: 'var(--color-success)',
+    accentSoft: 'color-mix(in srgb, var(--color-success) 8%, transparent)',
+    tasks: filteredTasks.value.filter(t => t.status === 'completed')
+  }
+])
+
+// ── Upcoming Deadlines ────────────────────────────────────────────────────────
+const upcomingDeadlines = computed(() =>
+  enrichedTasks.value
+    .filter(t => t.deadline && t.status !== 'completed' && new Date(t.deadline) >= new Date())
+    .sort((a, b) => new Date(a.deadline!).getTime() - new Date(b.deadline!).getTime())
+    .slice(0, 5)
+)
+
+// ── AI Prioritization ─────────────────────────────────────────────────────────
+const aiPriorities = computed(() =>
+  enrichedTasks.value
+    .filter(t => t.status !== 'completed')
+    .sort((a, b) => {
+      const pw = priorityWeight(b.priority) - priorityWeight(a.priority)
+      if (pw !== 0) return pw
+      return new Date(a.deadline || 0).getTime() - new Date(b.deadline || 0).getTime()
+    })
+    .slice(0, 3)
+)
+
+// ── Today's Agenda ────────────────────────────────────────────────────────────
+const todayAgenda = computed(() =>
+  schedules.value
+    .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime())
+)
+
+// ── Daily Habits ──────────────────────────────────────────────────────────────
+const dailyHabits = computed(() => {
+  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
+  const todayEnd = new Date(); todayEnd.setHours(23, 59, 59, 999)
+
+  // Study 2+ hours: sum estimatedDuration from active/completed tasks or today's schedules
+  const taskMins = tasks.value
+    .filter(t => (t.status === 'in_progress' || t.status === 'completed') && t.estimatedDuration)
+    .reduce((acc, t) => acc + (t.estimatedDuration || 0), 0)
+  const scheduleMins = schedules.value.reduce((acc, s) => {
+    const dur = (new Date(s.end).getTime() - new Date(s.start).getTime()) / 60000
+    return acc + Math.max(0, dur)
+  }, 0)
+  const studyMins = Math.max(taskMins, scheduleMins)
+  const studyTarget = 120
+  const studyDone = studyMins >= studyTarget
+
+  // Solve tasks: completed tasks today
+  const completedToday = tasks.value.filter(t => {
+    if (t.status !== 'completed' || !t.updatedAt) return false
+    const d = new Date(t.updatedAt)
+    return d >= todayStart && d <= todayEnd
+  }).length
+  const taskTarget = 10
+
+  // Review flashcards: tasks with status review or title containing review
+  const reviewCount = tasks.value.filter(t =>
+    t.status === 'review' || t.title.toLowerCase().includes('review') || t.title.toLowerCase().includes('flashcard')
+  ).length
+  const reviewTarget = 20
+
+  return [
+    {
+      label: 'Study for 2+ hours',
+      current: Math.round(studyMins / 60 * 10) / 10,
+      target: 2,
+      unit: 'h',
+      displayCurrent: studyMins > 0 ? `${Math.floor(studyMins / 60)}h ${studyMins % 60}m` : '0h',
+      displayTarget: '2h',
+      done: studyDone,
+      pct: Math.min(100, Math.round((studyMins / studyTarget) * 100))
+    },
+    {
+      label: 'Solve tasks/problems',
+      current: completedToday,
+      target: taskTarget,
+      unit: '',
+      displayCurrent: `${completedToday}`,
+      displayTarget: `${taskTarget}`,
+      done: completedToday >= taskTarget,
+      pct: Math.min(100, Math.round((completedToday / taskTarget) * 100))
+    },
+    {
+      label: 'Review flashcards',
+      current: reviewCount,
+      target: reviewTarget,
+      unit: '',
+      displayCurrent: `${reviewCount}`,
+      displayTarget: `${reviewTarget}`,
+      done: reviewCount >= reviewTarget,
+      pct: Math.min(100, Math.round((reviewCount / reviewTarget) * 100))
+    }
+  ]
 })
 
-watch(() => route.query.tab, () => {
-  syncTabFromQuery()
+// ── Recent Activity ───────────────────────────────────────────────────────────
+const recentActivity = computed(() => {
+  return enrichedTasks.value
+    .filter(t => t.updatedAt || t.createdAt)
+    .map(t => ({
+      _id: t._id,
+      text: t.status === 'completed'
+        ? `Completed ${t.title}`
+        : t.updatedAt
+          ? `Updated task: ${t.title}`
+          : `Added task: ${t.title}`,
+      icon: t.status === 'completed' ? 'i-lucide-check-circle-2' : t.updatedAt ? 'i-lucide-pencil' : 'i-lucide-plus-circle',
+      iconColor: t.status === 'completed' ? 'var(--color-success)' : 'var(--color-primary)',
+      time: relativeTime(t.updatedAt || t.createdAt)
+    }))
+    .sort((a, b) => {
+      const ta = tasks.value.find(t => t._id === a._id)
+      const tb = tasks.value.find(t => t._id === b._id)
+      return new Date(tb?.updatedAt || tb?.createdAt || 0).getTime() - new Date(ta?.updatedAt || ta?.createdAt || 0).getTime()
+    })
+    .slice(0, 5)
 })
+
+// ── Modal logic ───────────────────────────────────────────────────────────────
+function openAddModal(status: Task['status'] = 'todo') {
+  modalMode.value = 'add'
+  modalPresetStatus.value = status
+  form.value = {
+    _id: '',
+    title: '',
+    description: '',
+    courseId: '',
+    status,
+    priority: 'medium',
+    deadline: '',
+    estimatedDuration: 0
+  }
+  submitError.value = ''
+  showModal.value = true
+}
+
+function openEditModal(task: Task) {
+  modalMode.value = 'edit'
+  const cid = normalizeCourseId(task.courseId)
+  const deadline = task.deadline ? new Date(task.deadline).toISOString().slice(0, 16) : ''
+  form.value = {
+    _id: task._id,
+    title: task.title,
+    description: task.description || '',
+    courseId: cid,
+    status: task.status,
+    priority: task.priority,
+    deadline,
+    estimatedDuration: task.estimatedDuration || 0
+  }
+  submitError.value = ''
+  showModal.value = true
+}
+
+function closeModal() {
+  showModal.value = false
+  submitError.value = ''
+}
+
+async function submitForm() {
+  if (!form.value.title.trim()) {
+    submitError.value = 'Title is required.'
+    return
+  }
+  isSubmitting.value = true
+  submitError.value = ''
+  try {
+    const payload: Record<string, any> = {
+      title: form.value.title.trim(),
+      description: form.value.description,
+      status: form.value.status,
+      priority: form.value.priority,
+    }
+    if (form.value.courseId) payload.courseId = form.value.courseId
+    if (form.value.deadline) payload.deadline = new Date(form.value.deadline).toISOString()
+    if (form.value.estimatedDuration > 0) payload.estimatedDuration = Number(form.value.estimatedDuration)
+
+    if (modalMode.value === 'add') {
+      const res = await post<any>('/tasks', payload)
+      if (!res.success) throw new Error(res.message || 'Failed to create task')
+    } else {
+      const res = await put<any>(`/tasks/${form.value._id}`, payload)
+      if (!res.success) throw new Error(res.message || 'Failed to update task')
+    }
+    showModal.value = false
+    await loadData()
+  } catch (e: any) {
+    submitError.value = e.message || 'An error occurred'
+  } finally {
+    isSubmitting.value = false
+  }
+}
+
+function confirmDelete(id: string) {
+  deleteTargetId.value = id
+  showDeleteConfirm.value = true
+}
+
+async function executeDelete() {
+  if (!deleteTargetId.value) return
+  isSubmitting.value = true
+  try {
+    await del(`/tasks/${deleteTargetId.value}`)
+    showDeleteConfirm.value = false
+    deleteTargetId.value = ''
+    await loadData()
+  } catch (e) {
+    console.error('Delete error', e)
+  } finally {
+    isSubmitting.value = false
+  }
+}
+
+// Task card menu
+const openMenuId = ref<string | null>(null)
+function toggleMenu(id: string) {
+  openMenuId.value = openMenuId.value === id ? null : id
+}
+
+// Quick status change
+async function quickStatus(task: Task, status: Task['status']) {
+  openMenuId.value = null
+  const res = await put<any>(`/tasks/${task._id}`, { status })
+  if (res.success) await loadData()
+}
 </script>
 
 <template>
-  <section class="max-w-[1420px] mx-auto pb-8">
-    <template v-if="!isUnifiedExamsTasksMode">
-      <div class="rounded-2xl border p-8 text-center" style="border-color:var(--color-border);background:var(--color-surface)">
-        <h3 class="text-[20px] font-semibold" style="color:var(--color-text)">Tasks</h3>
-        <p class="text-[13px] mt-2" style="color:var(--color-text-soft)">This standalone Tasks page is currently empty.</p>
-      </div>
-    </template>
+  <section class="tasks-page max-w-[1600px] mx-auto pb-10">
 
-    <template v-else>
-    <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
-      <div class="flex items-center gap-5 border-b border-[var(--color-border)] w-full md:w-auto">
-        <button :class="['pb-2 text-[13px] font-semibold transition', tabClass('overview')]" @click="setTab('overview')">Overview</button>
-        <button :class="['pb-2 text-[13px] font-semibold transition', tabClass('exams')]" @click="setTab('exams')">Exams</button>
-        <button :class="['pb-2 text-[13px] font-semibold transition', tabClass('tasks')]" @click="setTab('tasks')">Tasks</button>
-      </div>
-
-      <div class="flex flex-wrap gap-2">
-        <select v-model="selectedCourse" class="h-9 px-3 rounded-xl text-[12px] border" style="border-color:var(--color-border);background:var(--color-surface)">
-          <option value="all">All Courses</option>
-          <option v-for="c in courses" :key="c._id" :value="c._id">{{ c.title }}</option>
-        </select>
-        <select v-model="selectedType" class="h-9 px-3 rounded-xl text-[12px] border" style="border-color:var(--color-border);background:var(--color-surface)">
-          <option value="all">All Types</option>
-          <option value="high">High Priority</option>
-          <option value="medium">Medium Priority</option>
-          <option value="low">Low Priority</option>
-        </select>
-        <select v-model="sortBy" class="h-9 px-3 rounded-xl text-[12px] border" style="border-color:var(--color-border);background:var(--color-surface)">
-          <option value="due">Sort by: Due Date</option>
-          <option value="priority">Sort by: Priority</option>
-        </select>
-        <button class="h-9 px-4 rounded-xl text-[12px] font-semibold text-white" style="background:var(--color-primary)" @click="showAddTask = true">Add task</button>
-      </div>
+    <!-- ── PAGE HEADER ──────────────────────────────────────────────────────── -->
+    <div class="page-header-row">
+      
+        <button class="btn-primary" @click="openAddModal('todo')">
+          <UIcon name="i-lucide-plus" class="size-4" />
+          Add Task
+        </button>
+     
     </div>
 
-    <div v-if="isLoading" class="flex justify-center py-24">
+    <!-- Loading -->
+    <div v-if="isLoading" class="flex items-center justify-center py-24">
       <UIcon name="i-lucide-loader-2" class="size-8 animate-spin" style="color:var(--color-primary)" />
     </div>
 
-    <template v-else-if="activeTab === 'overview'">
-      <div class="grid grid-cols-1 2xl:grid-cols-[1fr_330px] gap-5">
-        <div class="space-y-4">
-          <div class="rounded-2xl border p-4" style="border-color:var(--color-border);background:var(--color-surface);box-shadow:var(--shadow-card)">
-            <div class="flex items-center justify-between mb-4">
-              <h3 class="text-[18px] font-semibold" style="color:var(--color-text)">Upcoming Exams</h3>
-              <NuxtLink to="/dashboard/schedule" class="text-[13px] font-semibold" style="color:var(--color-primary)">View calendar</NuxtLink>
-            </div>
-            <div class="relative px-4 pt-7 pb-1">
-              <div class="absolute left-4 right-4 top-8 h-[2px] rounded-full" style="background:#cfd5f3"></div>
-              <div class="grid grid-cols-5 gap-3">
-                <div v-for="(e, i) in topUpcomingExams" :key="e._id" class="relative">
-                  <div class="absolute -top-5 left-1/2 -translate-x-1/2 text-[11px] font-semibold whitespace-nowrap" :style="`color:${examAccent(i)}`">
-                    {{ daysUntil(e.examDate).replace('Due', 'In') }}
+    <!-- Error State -->
+    <div v-else-if="loadError" class="error-state-panel">
+      <UIcon name="i-lucide-wifi-off" class="size-8" style="color:var(--color-danger)" />
+      <h3 class="error-state-title">Could not load tasks</h3>
+      <p class="error-state-msg">{{ loadError }}</p>
+      <div class="error-state-actions">
+        <button class="btn-primary" @click="loadData">
+          <UIcon name="i-lucide-refresh-cw" class="size-4" />
+          Retry
+        </button>
+        <NuxtLink to="/auth/signin" class="btn-secondary">
+          Sign in
+        </NuxtLink>
+      </div>
+    </div>
+
+    <template v-else>
+
+      <!-- ── STATS ROW ──────────────────────────────────────────────────────── -->
+      <div class="stats-row">
+        <!-- Total Tasks -->
+        <div class="stat-card">
+          <div class="stat-icon-wrap" style="background:color-mix(in srgb,var(--color-primary) 10%,transparent)">
+            <UIcon name="i-lucide-layout-list" class="size-4" style="color:var(--color-primary)" />
+          </div>
+          <div class="stat-body">
+            <p class="stat-label">Total Tasks</p>
+            <p class="stat-value">{{ stats.total }}</p>
+            <p class="stat-sub" style="color:var(--color-success)">
+              {{ stats.thisWeek > 0 ? `+${stats.thisWeek} this week` : 'Updated from your tasks' }}
+            </p>
+          </div>
+        </div>
+
+        <!-- Overdue -->
+        <div class="stat-card">
+          <div class="stat-icon-wrap" style="background:color-mix(in srgb,var(--color-danger) 10%,transparent)">
+            <UIcon name="i-lucide-alert-circle" class="size-4" style="color:var(--color-danger)" />
+          </div>
+          <div class="stat-body">
+            <p class="stat-label">Overdue</p>
+            <p class="stat-value" style="color:var(--color-danger)">{{ stats.overdue }}</p>
+            <p class="stat-sub" style="color:var(--color-danger)">Needs attention</p>
+          </div>
+        </div>
+
+        <!-- Completed -->
+        <div class="stat-card">
+          <div class="stat-icon-wrap" style="background:color-mix(in srgb,var(--color-success) 10%,transparent)">
+            <UIcon name="i-lucide-check-circle-2" class="size-4" style="color:var(--color-success)" />
+          </div>
+          <div class="stat-body">
+            <p class="stat-label">Completed</p>
+            <p class="stat-value" style="color:var(--color-success)">{{ stats.completed }}</p>
+            <p class="stat-sub" style="color:var(--color-success)">{{ stats.completionPct }}% completion</p>
+          </div>
+        </div>
+
+        <!-- Today's Priorities -->
+        <div class="stat-card">
+          <div class="stat-icon-wrap" style="background:color-mix(in srgb,var(--color-warning) 10%,transparent)">
+            <UIcon name="i-lucide-flame" class="size-4" style="color:var(--color-warning)" />
+          </div>
+          <div class="stat-body">
+            <p class="stat-label">Today's Priorities</p>
+            <p class="stat-value" style="color:var(--color-warning)">{{ stats.todayPriorities }}</p>
+            <p class="stat-sub" style="color:var(--color-warning)">High impact tasks</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── FILTER BAR ─────────────────────────────────────────────────────── -->
+      <div class="filter-bar">
+        <div class="filter-tabs">
+          <button
+            v-for="tab in [
+              { key: 'all', label: 'All' },
+              { key: 'upcoming', label: 'Upcoming' },
+              { key: 'in_progress', label: 'In Progress' },
+              { key: 'completed', label: 'Completed' },
+              { key: 'high_priority', label: 'High Priority' },
+            ]"
+            :key="tab.key"
+            class="filter-tab"
+            :class="activeTab === tab.key ? 'filter-tab--active' : ''"
+            @click="activeTab = tab.key as any"
+          >
+            {{ tab.label }}
+          </button>
+        </div>
+
+        <div class="filter-actions">
+          <button class="filter-btn">
+            <UIcon name="i-lucide-sliders-horizontal" class="size-3.5" />
+            Filters
+          </button>
+          <div class="sort-wrap">
+            <span class="sort-label">Sort by:</span>
+            <select v-model="sortBy" class="sort-select">
+              <option value="priority">Priority</option>
+              <option value="deadline">Deadline</option>
+              <option value="newest">Newest</option>
+              <option value="oldest">Oldest</option>
+            </select>
+          </div>
+          <div class="view-toggle">
+            <button
+              class="view-btn"
+              :class="viewMode === 'board' ? 'view-btn--active' : ''"
+              @click="viewMode = 'board'"
+              title="Board view"
+            >
+              <UIcon name="i-lucide-layout-dashboard" class="size-4" />
+            </button>
+            <button
+              class="view-btn"
+              :class="viewMode === 'list' ? 'view-btn--active' : ''"
+              @click="viewMode = 'list'"
+              title="List view"
+            >
+              <UIcon name="i-lucide-list" class="size-4" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── MAIN CONTENT ───────────────────────────────────────────────────── -->
+      <div class="main-grid">
+
+        <!-- ── LEFT / MAIN COLUMN ──────────────────────────────────────────── -->
+        <div class="main-col">
+
+          <!-- BOARD VIEW -->
+          <div v-if="viewMode === 'board'" class="kanban-board">
+            <div
+              v-for="col in kanbanColumns"
+              :key="col.id"
+              class="kanban-col"
+            >
+              <!-- Column accent bar -->
+              <div class="kanban-col-accent" :style="`background:${col.accent}`" />
+
+              <!-- Column header -->
+              <div class="kanban-col-header">
+                <span class="kanban-col-title">{{ col.label }}</span>
+                <span class="kanban-col-badge" :style="`background:color-mix(in srgb,${col.accent} 12%,transparent);color:${col.accent}`">
+                  {{ col.tasks.length }}
+                </span>
+              </div>
+
+              <!-- Task cards -->
+              <div class="kanban-cards">
+                <div v-if="col.tasks.length === 0" class="kanban-empty">
+                  <UIcon name="i-lucide-inbox" class="size-5" style="color:var(--color-text-muted)" />
+                  <p>No tasks here</p>
+                </div>
+
+                <div
+                  v-for="task in col.tasks"
+                  :key="task._id"
+                  class="task-card"
+                  :class="task.status === 'completed' ? 'task-card--completed' : ''"
+                >
+                  <div class="task-card-top">
+                    <div class="task-card-icon-wrap">
+                      <UIcon
+                        v-if="task.status === 'completed'"
+                        name="i-lucide-check-circle-2"
+                        class="size-4"
+                        style="color:var(--color-success)"
+                      />
+                      <UIcon
+                        v-else-if="task.status === 'review'"
+                        name="i-lucide-eye"
+                        class="size-4"
+                        style="color:var(--color-ai)"
+                      />
+                      <UIcon
+                        v-else-if="task.status === 'in_progress'"
+                        name="i-lucide-loader"
+                        class="size-4"
+                        style="color:var(--color-warning)"
+                      />
+                      <UIcon
+                        v-else
+                        name="i-lucide-square-check-big"
+                        class="size-4"
+                        style="color:var(--color-primary)"
+                      />
+                    </div>
+                    <p class="task-card-title" :class="task.status === 'completed' ? 'line-through' : ''">
+                      {{ task.title }}
+                    </p>
+                    <div class="task-card-menu-wrap">
+                      <button class="task-card-menu-btn" @click.stop="toggleMenu(task._id)">
+                        <UIcon name="i-lucide-more-horizontal" class="size-4" />
+                      </button>
+                      <div v-if="openMenuId === task._id" class="task-dropdown">
+                        <button class="task-dropdown-item" @click="openEditModal(task); openMenuId = null">
+                          <UIcon name="i-lucide-pencil" class="size-3.5" />Edit
+                        </button>
+                        <button
+                          v-if="task.status !== 'completed'"
+                          class="task-dropdown-item"
+                          @click="quickStatus(task, 'completed')"
+                        >
+                          <UIcon name="i-lucide-check" class="size-3.5" />Mark Complete
+                        </button>
+                        <button
+                          v-if="task.status === 'completed'"
+                          class="task-dropdown-item"
+                          @click="quickStatus(task, 'todo')"
+                        >
+                          <UIcon name="i-lucide-rotate-ccw" class="size-3.5" />Reopen
+                        </button>
+                        <button class="task-dropdown-item task-dropdown-item--danger" @click="confirmDelete(task._id); openMenuId = null">
+                          <UIcon name="i-lucide-trash-2" class="size-3.5" />Delete
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                  <div class="absolute top-[-1px] left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full" :style="`background:${examAccent(i)}`"></div>
-                  <div class="absolute top-[-4px] left-1/2 -translate-x-1/2 w-3.5 h-3.5 rounded-full border-2 bg-white" :style="`border-color:${examAccent(i)}`"></div>
-                  <div
-                    v-if="i < topUpcomingExams.length - 1"
-                    class="absolute top-[0px] left-[calc(100%+6px)] w-1.5 h-1.5 rounded-full"
-                    style="background:#5a5cff"
-                  />
+
+                  <p v-if="task.courseTitle" class="task-card-course">{{ task.courseTitle }}</p>
+
+                  <div class="task-card-meta">
+                    <div v-if="task.deadline" class="task-card-due" :class="daysUntilClass(task.deadline)">
+                      <UIcon name="i-lucide-calendar" class="size-3" />
+                      Due {{ formatDeadline(task.deadline) }}
+                    </div>
+                    <div v-if="task.estimatedDuration" class="task-card-duration">
+                      <UIcon name="i-lucide-clock" class="size-3" />
+                      {{ formatDuration(task.estimatedDuration) }}
+                    </div>
+                  </div>
+
+                  <div class="task-card-footer">
+                    <span
+                      class="priority-badge"
+                      :class="`priority-badge--${task.priority}`"
+                    >
+                      {{ task.priority.charAt(0).toUpperCase() + task.priority.slice(1) }}
+                    </span>
+                  </div>
                 </div>
               </div>
-            </div>
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mt-2">
-              <div v-for="(e, i) in topUpcomingExams" :key="`card-${e._id}`" class="w-full rounded-xl p-1.5">
-                <div class="flex items-start gap-2">
-                  <div class="w-[48px] h-[48px] rounded-[9px] border text-center flex flex-col items-center justify-center bg-white/70 dark:bg-transparent shrink-0" style="border-color:#d9dff2">
-                    <p class="w-full text-center text-[16px] leading-none font-semibold [font-variant-numeric:tabular-nums]" style="color:#1d2a53">{{ new Date(e.examDate).getDate() }}</p>
-                    <p class="text-[10px] leading-none font-bold uppercase mt-2" style="color:#334f70">{{ new Date(e.examDate).toLocaleDateString('en-GB', { month: 'short' }) }}</p>
-                  </div>
-                  <div class="min-w-0">
-                    <p class="text-[13px] font-semibold truncate" style="color:#1d2a53">{{ e.title }}</p>
-                    <p class="text-[12px] mt-0.5" style="color:#617392">{{ examTime(i) }}</p>
-                    <span class="inline-block w-[108px] mt-1 text-[10px] px-2 py-0.5 rounded-md truncate" :class="examChipClass(i)">{{ shortCourse(e.courseTitle) }}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div v-if="!topUpcomingExams.length" class="text-[12px] py-4 text-center" style="color:var(--color-text-soft)">
-              No upcoming exams.
+
+              <!-- Add button -->
+              <button class="kanban-add-btn" @click="openAddModal(col.status)">
+                <UIcon name="i-lucide-plus" class="size-3.5" />
+                Add Task
+              </button>
             </div>
           </div>
 
-          <div class="rounded-2xl border p-4" style="border-color:var(--color-border);background:var(--color-surface);box-shadow:var(--shadow-card)">
-            <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-              <h3 class="text-[18px] font-semibold" style="color:var(--color-text)">Task Board</h3>
-              <div class="flex items-center gap-3">
-                <p class="text-[13px]" style="color:var(--color-text-soft)">{{ stats.total }} tasks total</p>
-                <div class="w-40 h-2 rounded-full" style="background:var(--color-border)">
-                  <div class="h-2 rounded-full" :style="`background:var(--color-primary);width:${completionPct}%`"></div>
-                </div>
-                <p class="text-[13px] font-semibold" style="color:var(--color-text)">{{ completionPct }}%</p>
-              </div>
+          <!-- LIST VIEW -->
+          <div v-else class="list-view">
+            <div v-if="filteredTasks.length === 0" class="empty-state">
+              <UIcon name="i-lucide-clipboard-list" class="size-8" style="color:var(--color-text-muted)" />
+              <p>No tasks match your filters.</p>
             </div>
-
-            <div class="grid grid-cols-1 xl:grid-cols-3 gap-3">
-              <BoardColumn title="High Priority" tone="high" :items="boardColumns.high" @toggle="toggleTask">
-                <template #meta="{ task }">
-                  <div class="mt-1 flex items-center justify-between">
-                    <span class="text-[11px] px-2 py-0.5 rounded bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300">{{ shortCourse(task.courseTitle) }}</span>
-                    <span class="text-[12px] text-red-500">{{ daysUntil(task.deadline) }}</span>
-                  </div>
-                </template>
-              </BoardColumn>
-              <BoardColumn title="In Progress" tone="progress" :items="boardColumns.progress">
-                <template #meta="{ task }">
-                  <div class="mt-1 flex items-center justify-between">
-                    <span class="text-[11px] px-2 py-0.5 rounded bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300">{{ shortCourse(task.courseTitle) }}</span>
-                    <span class="text-[12px] text-amber-500">{{ daysUntil(task.deadline) }}</span>
-                  </div>
-                </template>
-              </BoardColumn>
-              <BoardColumn title="Completed" tone="completed" :items="boardColumns.completed">
-                <template #meta="{ task }">
-                  <div class="mt-1 flex items-center justify-between">
-                    <span class="text-[11px] px-2 py-0.5 rounded bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300">{{ shortCourse(task.courseTitle) }}</span>
-                    <span class="text-[12px]" style="color:var(--color-text-soft)">{{ formatShortDate(task.updatedAt || task.deadline) }}</span>
-                  </div>
-                </template>
-              </BoardColumn>
+            <div
+              v-for="task in filteredTasks"
+              :key="task._id"
+              class="list-task-row"
+            >
+              <div class="list-task-left">
+                <UIcon
+                  v-if="task.status === 'completed'"
+                  name="i-lucide-check-circle-2"
+                  class="size-4"
+                  style="color:var(--color-success)"
+                />
+                <UIcon v-else name="i-lucide-circle" class="size-4" style="color:var(--color-text-muted)" />
+                <div>
+                  <p class="list-task-title" :class="task.status === 'completed' ? 'line-through' : ''">
+                    {{ task.title }}
+                  </p>
+                  <p v-if="task.courseTitle" class="list-task-course">{{ task.courseTitle }}</p>
+                </div>
+              </div>
+              <div class="list-task-right">
+                <span v-if="task.deadline" class="list-task-due">
+                  {{ formatDeadline(task.deadline) }}
+                </span>
+                <span class="priority-badge" :class="`priority-badge--${task.priority}`">
+                  {{ task.priority.charAt(0).toUpperCase() + task.priority.slice(1) }}
+                </span>
+                <button class="icon-btn-sm" @click="openEditModal(task)">
+                  <UIcon name="i-lucide-pencil" class="size-3.5" />
+                </button>
+                <button class="icon-btn-sm icon-btn-sm--danger" @click="confirmDelete(task._id)">
+                  <UIcon name="i-lucide-trash-2" class="size-3.5" />
+                </button>
+              </div>
             </div>
           </div>
 
-          <div class="grid grid-cols-1 xl:grid-cols-3 gap-3">
-            <div class="rounded-2xl border p-4" style="border-color:var(--color-border);background:var(--color-surface)">
-              <h4 class="text-[18px] font-semibold mb-3" style="color:var(--color-text)">Task Overview</h4>
-              <div class="grid grid-cols-2 gap-2.5">
-                <div class="rounded-xl border p-3" style="border-color:var(--color-border)"><p class="text-[24px] font-semibold">{{ stats.total }}</p><p class="text-[12px]" style="color:var(--color-text-soft)">Total Tasks</p></div>
-                <div class="rounded-xl border p-3" style="border-color:var(--color-border)"><p class="text-[24px] font-semibold text-emerald-600">{{ stats.completed }}</p><p class="text-[12px]" style="color:var(--color-text-soft)">Completed</p></div>
-                <div class="rounded-xl border p-3" style="border-color:var(--color-border)"><p class="text-[24px] font-semibold text-amber-500">{{ stats.inProgress }}</p><p class="text-[12px]" style="color:var(--color-text-soft)">In Progress</p></div>
-                <div class="rounded-xl border p-3" style="border-color:var(--color-border)"><p class="text-[24px] font-semibold text-red-500">{{ stats.overdue }}</p><p class="text-[12px]" style="color:var(--color-text-soft)">Overdue</p></div>
-              </div>
-            </div>
+          <!-- ── BOTTOM ROW ──────────────────────────────────────────────────── -->
+          <div class="bottom-row">
 
-            <div class="rounded-2xl border p-4" style="border-color:var(--color-border);background:var(--color-surface)">
-              <h4 class="text-[18px] font-semibold mb-3" style="color:var(--color-text)">Tasks by Course</h4>
-              <div class="space-y-3">
-                <div v-for="row in tasksByCourse" :key="row.name">
-                  <div class="flex justify-between text-[12px] mb-1"><span>{{ row.name }}</span><span>{{ row.count }} ({{ row.pct }}%)</span></div>
-                  <div class="h-2 rounded-full" style="background:var(--color-border)"><div class="h-2 rounded-full" :style="`background:var(--color-primary);width:${row.pct}%`"></div></div>
+            <!-- Upcoming Deadlines -->
+            <div class="section-card deadline-card">
+              <div class="card-header">
+                <h3 class="card-title">Upcoming Deadlines</h3>
+                <button class="card-link">View all deadlines →</button>
+              </div>
+              <div v-if="upcomingDeadlines.length === 0" class="empty-state">
+                <UIcon name="i-lucide-calendar-check" class="size-6" style="color:var(--color-text-muted)" />
+                <p>No upcoming deadlines.</p>
+              </div>
+              <div v-else class="deadline-list">
+                <div
+                  v-for="task in upcomingDeadlines"
+                  :key="task._id"
+                  class="deadline-row"
+                >
+                  <div class="deadline-date">
+                    <span class="deadline-day">{{ new Date(task.deadline!).getDate() }}</span>
+                    <span class="deadline-month">{{ new Date(task.deadline!).toLocaleDateString('en-GB', { month: 'short' }).toUpperCase() }}</span>
+                  </div>
+                  <div class="deadline-info">
+                    <p class="deadline-title">{{ task.title }}</p>
+                    <p v-if="task.courseTitle" class="deadline-course">{{ task.courseTitle }}</p>
+                  </div>
+                  <div class="deadline-right">
+                    <span v-if="task.estimatedDuration" class="deadline-dur">{{ formatDuration(task.estimatedDuration) }}</span>
+                    <span class="priority-badge" :class="`priority-badge--${task.priority}`">
+                      {{ task.priority.charAt(0).toUpperCase() + task.priority.slice(1) }}
+                    </span>
+                    <span class="due-chip" :class="daysUntilClass(task.deadline)">
+                      {{ daysUntilLabel(task.deadline) }}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div class="rounded-2xl border p-4" style="border-color:var(--color-border);background:var(--color-surface)">
-              <h4 class="text-[18px] font-semibold mb-3" style="color:var(--color-text)">Recent Activity</h4>
-              <div class="space-y-3">
-                <div v-for="a in activityFeed" :key="a.id" class="rounded-xl border p-3" style="border-color:var(--color-border)">
-                  <p class="text-[12px] font-medium">{{ a.title }}</p>
-                  <p class="text-[11px]" style="color:var(--color-text-soft)">{{ a.subtitle }}</p>
+            <!-- Task Progress Overview -->
+            <div class="section-card progress-card">
+              <div class="card-header">
+                <h3 class="card-title">Task Progress Overview</h3>
+                <button class="card-link">View detailed analytics →</button>
+              </div>
+              <div class="progress-content">
+                <div class="donut-wrap">
+                  <svg viewBox="0 0 128 128" width="128" height="128" class="donut-svg">
+                    <circle
+                      cx="64" cy="64" r="54"
+                      fill="none"
+                      stroke="var(--color-border)"
+                      stroke-width="14"
+                    />
+                    <circle
+                      v-for="seg in donutSegments"
+                      :key="seg.label"
+                      cx="64" cy="64" r="54"
+                      fill="none"
+                      :stroke="seg.color"
+                      stroke-width="14"
+                      stroke-linecap="round"
+                      :stroke-dasharray="`${(seg.pct / 100) * DONUT_CIRC} ${DONUT_CIRC}`"
+                      :stroke-dashoffset="0"
+                      :transform="donutRotation(seg.startPct)"
+                    />
+                  </svg>
+                  <div class="donut-center">
+                    <span class="donut-pct">{{ stats.completionPct }}%</span>
+                    <span class="donut-label">Overall Progress</span>
+                  </div>
+                </div>
+                <div class="progress-legend">
+                  <div v-for="seg in donutSegments" :key="seg.label" class="legend-row">
+                    <span class="legend-dot" :style="`background:${seg.color}`" />
+                    <span class="legend-name">{{ seg.label }}</span>
+                    <span class="legend-count">{{ seg.count }}</span>
+                    <span class="legend-pct">({{ seg.pct }}%)</span>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
         </div>
 
-        <aside class="space-y-3">
-          <div class="rounded-2xl p-4 text-white" style="background:linear-gradient(160deg,#3730a3,#4f46e5 45%,#4338ca)">
-            <div class="flex items-center justify-between mb-3">
-              <h4 class="text-[18px] font-semibold">AI Prioritization</h4>
-              <span class="text-[10px] px-2 py-0.5 rounded bg-white/20">BETA</span>
+        <!-- ── RIGHT SIDEBAR ──────────────────────────────────────────────────── -->
+        <aside class="right-sidebar">
+
+          <!-- AI Prioritization -->
+          <div class="section-card sidebar-panel">
+            <div class="card-header">
+              <div class="flex items-center gap-2">
+                <UIcon name="i-lucide-sparkles" class="size-4" style="color:var(--color-ai)" />
+                <h3 class="card-title">AI Prioritization</h3>
+              </div>
+              <UIcon name="i-lucide-info" class="size-4" style="color:var(--color-text-muted)" />
             </div>
-            <p class="text-[12px] text-white/90 mb-3">Based on your exams, deadlines and performance, here's what to focus on first.</p>
-            <div class="space-y-2 mb-3">
-              <div v-for="p in aiPriorities" :key="p.index" class="rounded-xl bg-white text-[var(--color-text)] px-3 py-2">
-                <div class="flex items-start gap-2">
-                  <span class="w-6 h-6 rounded-md bg-indigo-100 text-indigo-700 text-[12px] font-semibold flex items-center justify-center">{{ p.index }}</span>
-                  <div class="flex-1 min-w-0">
-                    <p class="text-[12px] font-semibold truncate">{{ p.title }}</p>
-                    <div class="flex items-center justify-between">
-                      <span class="text-[10px] px-1.5 py-0.5 rounded bg-sky-100 text-sky-700">{{ shortCourse(p.course) }}</span>
-                      <span class="text-[10px] font-semibold" :class="p.impactTone">{{ p.impact }}</span>
-                    </div>
+            <p class="card-subtitle">Based on deadlines, priority and your study patterns.</p>
+
+            <div v-if="aiPriorities.length === 0" class="empty-state">
+              <p>No tasks to prioritize.</p>
+            </div>
+            <div v-else class="ai-list">
+              <div v-for="(task, idx) in aiPriorities" :key="task._id" class="ai-row">
+                <span class="ai-rank">{{ idx + 1 }}</span>
+                <div class="ai-info">
+                  <p class="ai-title">{{ task.title }}</p>
+                  <div class="ai-meta">
+                    <span v-if="task.deadline" class="ai-due">
+                      {{ daysUntilLabel(task.deadline) }}
+                    </span>
+                    <span class="priority-badge" :class="`priority-badge--${task.priority}`">
+                      {{ task.priority.charAt(0).toUpperCase() + task.priority.slice(1) }}
+                    </span>
                   </div>
+                </div>
+                <button class="btn-start" @click="openEditModal(task as Task)">Start</button>
+              </div>
+            </div>
+
+            <button class="card-footer-link">View all recommendations →</button>
+          </div>
+
+          <!-- Today's Agenda -->
+          <div class="section-card sidebar-panel">
+            <div class="card-header">
+              <h3 class="card-title">Today's Agenda</h3>
+              <button class="card-link">View all</button>
+            </div>
+
+            <div v-if="todayAgenda.length === 0" class="empty-state">
+              <UIcon name="i-lucide-calendar-x" class="size-5" style="color:var(--color-text-muted)" />
+              <p>No agenda scheduled today.</p>
+            </div>
+            <div v-else class="agenda-list">
+              <div v-for="ev in todayAgenda" :key="ev._id" class="agenda-row">
+                <div class="agenda-time">{{ scheduleTimeLabel(ev) }}</div>
+                <div class="agenda-dot-col">
+                  <span class="agenda-dot" :class="`agenda-dot--${ev.type}`" />
+                </div>
+                <div class="agenda-info">
+                  <p class="agenda-title">{{ ev.title }}</p>
+                  <p v-if="scheduleCourseName(ev)" class="agenda-course">{{ scheduleCourseName(ev) }}</p>
                 </div>
               </div>
             </div>
-            <button class="w-full h-9 rounded-lg bg-white/20 text-[12px] font-semibold">Generate new priorities</button>
+
+            <button class="card-footer-link">
+              <UIcon name="i-lucide-external-link" class="size-3.5" />
+              Open full agenda
+            </button>
           </div>
 
-          <div class="rounded-2xl border p-4" style="border-color:var(--color-border);background:var(--color-surface)">
-            <div class="flex items-center justify-between mb-3">
-              <h4 class="text-[18px] font-semibold" style="color:var(--color-text)">Study Checklist</h4>
-              <button class="text-[12px]" style="color:var(--color-primary)">Edit</button>
+          <!-- Daily Habits -->
+          <div class="section-card sidebar-panel">
+            <div class="card-header">
+              <h3 class="card-title">Daily Habits</h3>
+              <button class="card-link">View all</button>
             </div>
-            <div class="flex items-center gap-3 mb-3">
-              <div class="relative size-16 rounded-full grid place-items-center border-4" style="border-color:var(--color-border)">
-                <div class="absolute inset-0 rounded-full border-4 border-transparent" :style="`border-top-color:var(--color-primary);transform:rotate(${(checklistDone / checklist.length) * 360}deg)`"></div>
-                <span class="text-[12px] font-semibold">{{ checklistDone }}/{{ checklist.length }}</span>
+            <div class="habits-list">
+              <div v-for="habit in dailyHabits" :key="habit.label" class="habit-row">
+                <div class="habit-header">
+                  <div class="habit-icon-wrap">
+                    <UIcon
+                      v-if="habit.done"
+                      name="i-lucide-check-circle-2"
+                      class="size-4"
+                      style="color:var(--color-success)"
+                    />
+                    <UIcon
+                      v-else
+                      name="i-lucide-circle"
+                      class="size-4"
+                      style="color:var(--color-text-muted)"
+                    />
+                  </div>
+                  <span class="habit-label">{{ habit.label }}</span>
+                  <span class="habit-count">{{ habit.displayCurrent }} / {{ habit.displayTarget }}</span>
+                </div>
+                <div class="habit-bar-wrap">
+                  <div class="habit-bar" :style="`width:${habit.pct}%;background:${habit.done ? 'var(--color-success)' : 'var(--color-primary)'}`" />
+                </div>
               </div>
-              <p class="text-[13px]" style="color:var(--color-text-soft)">Tasks done</p>
             </div>
-            <div class="space-y-2">
-              <label v-for="c in checklist" :key="c.key" class="flex items-center gap-2 text-[13px]">
-                <input type="checkbox" :checked="c.done" class="size-4 rounded" />
-                <span :style="c.done ? 'color:var(--color-text)' : 'color:var(--color-text-soft)'">{{ c.label }}</span>
-              </label>
+          </div>
+
+          <!-- Recent Activity -->
+          <div class="section-card sidebar-panel">
+            <div class="card-header">
+              <h3 class="card-title">Recent Activity</h3>
+              <button class="card-link">View all</button>
+            </div>
+
+            <div v-if="recentActivity.length === 0" class="empty-state">
+              <p>No recent task activity.</p>
+            </div>
+            <div v-else class="activity-list">
+              <div v-for="item in recentActivity" :key="item._id" class="activity-row">
+                <UIcon :name="item.icon" class="size-4 flex-shrink-0" :style="`color:${item.iconColor}`" />
+                <div class="activity-info">
+                  <p class="activity-text">{{ item.text }}</p>
+                  <p class="activity-time">{{ item.time }}</p>
+                </div>
+              </div>
             </div>
           </div>
         </aside>
       </div>
     </template>
 
-    <template v-else-if="activeTab === 'exams'">
-      <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        <div v-for="e in filteredUpcomingExams" :key="e._id" class="rounded-2xl border p-4" style="border-color:var(--color-border);background:var(--color-surface)">
-          <div class="flex items-center justify-between mb-2">
-            <span class="text-[12px] px-2 py-1 rounded-lg bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300">{{ daysUntil(e.examDate) }}</span>
-            <span class="text-[12px]" style="color:var(--color-text-soft)">{{ formatShortDate(e.examDate) }}</span>
-          </div>
-          <h3 class="text-[16px] font-semibold" style="color:var(--color-text)">{{ e.title }}</h3>
-          <p class="text-[13px]" style="color:var(--color-text-soft)">{{ e.courseTitle }}</p>
-        </div>
-      </div>
-    </template>
+    <!-- ── OVERLAY to close menus ──────────────────────────────────────────── -->
+    <div v-if="openMenuId" class="fixed inset-0 z-30" @click="openMenuId = null" />
 
-    <template v-else>
-      <div class="flex items-center gap-2 mb-4">
-        <button v-for="f in ['all', 'todo', 'in_progress', 'completed']" :key="f" class="h-9 px-3 rounded-lg text-[12px] font-semibold capitalize border" :style="taskFilter === f ? 'background:var(--color-primary);color:#fff;border-color:var(--color-primary)' : 'border-color:var(--color-border);color:var(--color-text)'" @click="taskFilter = f as any">{{ f.replace('_', ' ') }}</button>
-      </div>
-      <div class="space-y-3">
-        <div v-for="t in filteredTasks" :key="t._id" class="rounded-xl border p-4" style="border-color:var(--color-border);background:var(--color-surface)">
-          <div class="flex items-center gap-3">
-            <button class="size-5 rounded-full border flex items-center justify-center" :style="t.status === 'completed' ? 'background:var(--color-success);color:#fff;border-color:var(--color-success)' : 'border-color:var(--color-border)'" @click="toggleTask(t)">
-              <UIcon v-if="t.status === 'completed'" name="i-lucide-check" class="size-3" />
-            </button>
-            <div class="flex-1 min-w-0">
-              <p class="text-[14px] font-semibold truncate" :style="t.status === 'completed' ? 'text-decoration:line-through;color:var(--color-text-muted)' : 'color:var(--color-text)'">{{ t.title }}</p>
-              <p class="text-[12px]" style="color:var(--color-text-soft)">{{ t.courseTitle }} • {{ t.deadline ? formatShortDate(t.deadline) : 'No due date' }}</p>
+    <!-- ── ADD/EDIT TASK MODAL ────────────────────────────────────────────── -->
+    <div v-if="showModal" class="modal-overlay" @click.self="closeModal">
+      <div class="modal-box">
+        <div class="modal-header">
+          <h2 class="modal-title">{{ modalMode === 'add' ? 'Add New Task' : 'Edit Task' }}</h2>
+          <button class="modal-close" @click="closeModal">
+            <UIcon name="i-lucide-x" class="size-5" />
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label">Title *</label>
+            <input
+              v-model="form.title"
+              class="form-input"
+              placeholder="Task title"
+            >
+          </div>
+          <div class="form-group">
+            <label class="form-label">Description</label>
+            <textarea
+              v-model="form.description"
+              class="form-input form-textarea"
+              placeholder="Optional description"
+              rows="2"
+            />
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Course</label>
+              <select v-model="form.courseId" class="form-input">
+                <option value="">No course</option>
+                <option v-for="c in courses" :key="c._id" :value="c._id">{{ c.title }}</option>
+              </select>
             </div>
-            <span class="text-[11px] px-2 py-0.5 rounded border capitalize" :class="toneBadge(t.priority)">{{ t.priority }}</span>
+            <div class="form-group">
+              <label class="form-label">Status</label>
+              <select v-model="form.status" class="form-input">
+                <option value="todo">To Do</option>
+                <option value="in_progress">In Progress</option>
+                <option value="review">Review</option>
+                <option value="completed">Completed</option>
+              </select>
+            </div>
           </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Priority</label>
+              <select v-model="form.priority" class="form-input">
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Est. Duration (min)</label>
+              <input
+                v-model.number="form.estimatedDuration"
+                type="number"
+                min="0"
+                class="form-input"
+                placeholder="e.g. 90"
+              >
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Deadline</label>
+            <input
+              v-model="form.deadline"
+              type="datetime-local"
+              class="form-input"
+            >
+          </div>
+          <p v-if="submitError" class="form-error">{{ submitError }}</p>
         </div>
-      </div>
-    </template>
-
-    <div v-if="showAddTask" class="fixed inset-0 z-50 bg-black/45 grid place-items-center p-4">
-      <div class="w-full max-w-md rounded-2xl border p-5" style="border-color:var(--color-border);background:var(--color-surface)">
-        <h3 class="text-[20px] font-semibold mb-4">Add New Task</h3>
-        <div class="space-y-3">
-          <input v-model="newTask.title" placeholder="Task title" class="w-full h-10 px-3 rounded-lg border" style="border-color:var(--color-border);background:var(--color-surface)">
-          <select v-model="newTask.priority" class="w-full h-10 px-3 rounded-lg border" style="border-color:var(--color-border);background:var(--color-surface)">
-            <option value="low">Low Priority</option>
-            <option value="medium">Medium Priority</option>
-            <option value="high">High Priority</option>
-          </select>
-          <input v-model="newTask.deadline" type="date" class="w-full h-10 px-3 rounded-lg border" style="border-color:var(--color-border);background:var(--color-surface)">
-          <select v-model="newTask.courseId" class="w-full h-10 px-3 rounded-lg border" style="border-color:var(--color-border);background:var(--color-surface)">
-            <option value="">No course</option>
-            <option v-for="c in courses" :key="c._id" :value="c._id">{{ c.title }}</option>
-          </select>
-        </div>
-        <div class="grid grid-cols-2 gap-3 mt-5">
-          <button class="h-10 rounded-lg border" style="border-color:var(--color-border)" @click="showAddTask = false">Cancel</button>
-          <button class="h-10 rounded-lg text-white font-semibold" style="background:var(--color-primary)" @click="addTask">Add Task</button>
+        <div class="modal-footer">
+          <button class="btn-secondary" @click="closeModal">Cancel</button>
+          <button class="btn-primary" :disabled="isSubmitting" @click="submitForm">
+            <UIcon v-if="isSubmitting" name="i-lucide-loader-2" class="size-4 animate-spin" />
+            {{ modalMode === 'add' ? 'Add Task' : 'Save Changes' }}
+          </button>
         </div>
       </div>
     </div>
-    </template>
+
+    <!-- ── DELETE CONFIRM ─────────────────────────────────────────────────── -->
+    <div v-if="showDeleteConfirm" class="modal-overlay" @click.self="showDeleteConfirm = false">
+      <div class="modal-box modal-box--sm">
+        <div class="modal-header">
+          <h2 class="modal-title">Delete Task</h2>
+          <button class="modal-close" @click="showDeleteConfirm = false">
+            <UIcon name="i-lucide-x" class="size-5" />
+          </button>
+        </div>
+        <div class="modal-body">
+          <p style="color:var(--color-text-soft);font-size:14px">
+            Are you sure you want to delete this task? This action cannot be undone.
+          </p>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-secondary" @click="showDeleteConfirm = false">Cancel</button>
+          <button class="btn-danger" :disabled="isSubmitting" @click="executeDelete">
+            <UIcon v-if="isSubmitting" name="i-lucide-loader-2" class="size-4 animate-spin" />
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
+
   </section>
 </template>
 
 <style scoped>
-p,
-h1,
-h2,
-h3,
-h4,
-h5,
-h6 {
-  margin-top: 0;
-  margin-bottom: 0;
+/* ── Base ─────────────────────────────────────────────────────────────────── */
+p, h1, h2, h3, h4, h5, h6 { margin: 0; }
+
+.tasks-page {
+  font-family: var(--font-sans);
+}
+
+/* ── Page Header ──────────────────────────────────────────────────────────── */
+.page-header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: end;
+  gap: 16px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.page-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--color-text);
+  line-height: 1.2;
+}
+
+.page-subtitle {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  margin-top: 4px;
+}
+
+.page-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.search-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-icon {
+  position: absolute;
+  left: 10px;
+  width: 16px;
+  height: 16px;
+  color: var(--color-text-muted);
+}
+
+.search-input {
+  height: 38px;
+  padding: 0 12px 0 34px;
+  font-size: 13px;
+  width: 260px;
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  outline: none;
+  transition: border-color var(--transition-fast);
+}
+
+.search-input:focus {
+  border-color: var(--color-primary);
+}
+
+.icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.icon-btn:hover {
+  background: var(--color-bg-soft);
+  color: var(--color-text);
+}
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--color-primary);
+  border: none;
+  border-radius: var(--radius-xl);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+  white-space: nowrap;
+}
+
+.btn-primary:hover { background: var(--color-primary-hover); }
+.btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.btn-secondary:hover { background: var(--color-bg-soft); }
+
+.btn-danger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--color-danger);
+  border: none;
+  border-radius: var(--radius-xl);
+  cursor: pointer;
+  transition: opacity var(--transition-fast);
+}
+
+.btn-danger:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* ── Stats Row ────────────────────────────────────────────────────────────── */
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+@media (max-width: 900px) {
+  .stats-row { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 480px) {
+  .stats-row { grid-template-columns: 1fr; }
+}
+
+.stat-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-card);
+  min-height: 100px;
+}
+
+.stat-icon-wrap {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.stat-body { flex: 1; min-width: 0; }
+
+.stat-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  margin-bottom: 4px;
+}
+
+.stat-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--color-text);
+  line-height: 1;
+  margin-bottom: 6px;
+}
+
+.stat-sub {
+  font-size: 11px;
+  font-weight: 500;
+}
+
+/* ── Filter Bar ───────────────────────────────────────────────────────────── */
+.filter-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.filter-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.filter-tab {
+  height: 34px;
+  padding: 0 14px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: var(--radius-full);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+
+.filter-tab:hover {
+  background: var(--color-bg-soft);
+  color: var(--color-text);
+}
+
+.filter-tab--active {
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.filter-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.filter-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-soft);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.filter-btn:hover { background: var(--color-bg-soft); }
+
+.sort-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sort-label {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.sort-select {
+  height: 34px;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  outline: none;
+  cursor: pointer;
+}
+
+.view-toggle {
+  display: flex;
+  align-items: center;
+  background: var(--color-bg-soft);
+  border-radius: var(--radius-lg);
+  padding: 2px;
+  gap: 2px;
+}
+
+.view-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 30px;
+  border-radius: var(--radius-md);
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.view-btn--active {
+  background: var(--color-surface);
+  color: var(--color-primary);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ── Main Grid ────────────────────────────────────────────────────────────── */
+.main-grid {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: 18px;
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .main-grid { grid-template-columns: 1fr; }
+}
+
+.main-col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+
+/* ── Kanban Board ─────────────────────────────────────────────────────────── */
+.kanban-board {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  min-width: 0;
+}
+
+@media (max-width: 1200px) {
+  .kanban-board { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 600px) {
+  .kanban-board { grid-template-columns: 1fr; }
+}
+
+.kanban-col {
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  min-height: 420px;
+  box-shadow: var(--shadow-card);
+}
+
+.kanban-col-accent {
+  height: 3px;
+  flex-shrink: 0;
+}
+
+.kanban-col-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 12px 8px;
+}
+
+.kanban-col-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.kanban-col-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+}
+
+.kanban-cards {
+  flex: 1;
+  padding: 0 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  max-height: 480px;
+  scrollbar-width: none;
+}
+
+.kanban-cards::-webkit-scrollbar { display: none; }
+
+.kanban-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 32px 12px;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+/* Task Card */
+.task-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 10px;
+  transition: box-shadow var(--transition-fast), transform var(--transition-fast);
+  position: relative;
+}
+
+.task-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+.task-card--completed {
+  opacity: 0.7;
+}
+
+.task-card-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.task-card-icon-wrap {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.task-card-title {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text);
+  line-height: 1.4;
+  min-width: 0;
+  word-break: break-word;
+}
+
+.task-card-menu-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.task-card-menu-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-md);
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.task-card-menu-btn:hover { background: var(--color-bg-soft); }
+
+.task-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 50;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  min-width: 140px;
+  padding: 4px;
+  margin-top: 2px;
+}
+
+.task-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 7px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--transition-fast);
+}
+
+.task-dropdown-item:hover { background: var(--color-bg-soft); }
+
+.task-dropdown-item--danger { color: var(--color-danger); }
+.task-dropdown-item--danger:hover { background: color-mix(in srgb, var(--color-danger) 8%, transparent); }
+
+.task-card-course {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  margin-bottom: 6px;
+  padding-left: 22px;
+}
+
+.task-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 22px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+
+.task-card-due, .task-card-duration {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.task-card-footer {
+  padding-left: 22px;
+}
+
+/* Due classes */
+.due-overdue { color: var(--color-danger); }
+.due-soon { color: var(--color-warning); }
+.due-ok { color: var(--color-text-muted); }
+.due-neutral { color: var(--color-text-muted); }
+
+/* Priority badges */
+.priority-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.priority-badge--high {
+  background: color-mix(in srgb, var(--color-danger) 10%, transparent);
+  color: var(--color-danger);
+  border-color: color-mix(in srgb, var(--color-danger) 20%, transparent);
+}
+
+.priority-badge--medium {
+  background: color-mix(in srgb, var(--color-warning) 12%, transparent);
+  color: var(--color-warning);
+  border-color: color-mix(in srgb, var(--color-warning) 25%, transparent);
+}
+
+.priority-badge--low {
+  background: color-mix(in srgb, var(--color-success) 10%, transparent);
+  color: var(--color-success);
+  border-color: color-mix(in srgb, var(--color-success) 20%, transparent);
+}
+
+/* Add task button */
+.kanban-add-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: calc(100% - 16px);
+  margin: 8px;
+  height: 34px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.kanban-add-btn:hover {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 4%, transparent);
+}
+
+/* ── List view ────────────────────────────────────────────────────────────── */
+.list-view {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: 12px;
+  box-shadow: var(--shadow-card);
+}
+
+.list-task-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  transition: box-shadow var(--transition-fast);
+}
+
+.list-task-row:hover { box-shadow: var(--shadow-sm); }
+
+.list-task-left { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; }
+
+.list-task-title { font-size: 13px; font-weight: 600; color: var(--color-text); }
+.list-task-course { font-size: 11px; color: var(--color-text-muted); }
+
+.list-task-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; flex-wrap: wrap; }
+
+.list-task-due {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.icon-btn-sm {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.icon-btn-sm:hover { background: var(--color-bg-soft); color: var(--color-text); }
+.icon-btn-sm--danger:hover { color: var(--color-danger); border-color: var(--color-danger); }
+
+/* ── Bottom Row ───────────────────────────────────────────────────────────── */
+.bottom-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 800px) {
+  .bottom-row { grid-template-columns: 1fr; }
+}
+
+/* ── Section Card ─────────────────────────────────────────────────────────── */
+.section-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: 16px;
+  box-shadow: var(--shadow-card);
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.card-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.card-link {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-primary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: opacity var(--transition-fast);
+  white-space: nowrap;
+}
+
+.card-link:hover { opacity: 0.7; }
+
+.card-subtitle {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  margin-bottom: 12px;
+}
+
+.card-footer-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-primary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: opacity var(--transition-fast);
+}
+
+.card-footer-link:hover { opacity: 0.7; }
+
+/* ── Empty State ──────────────────────────────────────────────────────────── */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 20px 12px;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+/* ── Deadline Card ────────────────────────────────────────────────────────── */
+.deadline-list { display: flex; flex-direction: column; gap: 0; }
+
+.deadline-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.deadline-row:last-child { border-bottom: none; }
+
+.deadline-date {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-soft);
+  flex-shrink: 0;
+}
+
+.deadline-day {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-text);
+  line-height: 1;
+}
+
+.deadline-month {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.deadline-info { flex: 1; min-width: 0; }
+.deadline-title { font-size: 13px; font-weight: 600; color: var(--color-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.deadline-course { font-size: 11px; color: var(--color-text-muted); margin-top: 2px; }
+
+.deadline-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.deadline-dur {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.due-chip {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  white-space: nowrap;
+}
+
+.due-chip.due-overdue { background: color-mix(in srgb, var(--color-danger) 10%, transparent); color: var(--color-danger); }
+.due-chip.due-soon { background: color-mix(in srgb, var(--color-warning) 12%, transparent); color: var(--color-warning); }
+.due-chip.due-ok { background: color-mix(in srgb, var(--color-success) 10%, transparent); color: var(--color-success); }
+.due-chip.due-neutral { background: var(--color-bg-soft); color: var(--color-text-muted); }
+
+/* ── Progress Card ────────────────────────────────────────────────────────── */
+.progress-content {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.donut-wrap {
+  position: relative;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.donut-svg { transform: rotate(-90deg); }
+
+.donut-center {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  top: 0; left: 0; right: 0; bottom: 0;
+}
+
+.donut-pct {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--color-text);
+  line-height: 1;
+}
+
+.donut-label {
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-align: center;
+  line-height: 1.2;
+  margin-top: 3px;
+}
+
+.progress-legend { display: flex; flex-direction: column; gap: 8px; flex: 1; min-width: 0; }
+
+.legend-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.legend-name { flex: 1; color: var(--color-text-soft); font-weight: 500; }
+.legend-count { font-weight: 700; color: var(--color-text); }
+.legend-pct { color: var(--color-text-muted); }
+
+/* ── Right Sidebar ────────────────────────────────────────────────────────── */
+.right-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.sidebar-panel { }
+
+/* ── AI List ──────────────────────────────────────────────────────────────── */
+.ai-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 4px; }
+
+.ai-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-soft);
+}
+
+.ai-rank {
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-md);
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.ai-info { flex: 1; min-width: 0; }
+
+.ai-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ai-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 3px;
+  flex-wrap: wrap;
+}
+
+.ai-due {
+  font-size: 10px;
+  color: var(--color-text-muted);
+}
+
+.btn-start {
+  height: 26px;
+  padding: 0 10px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-primary);
+  background: var(--color-primary-soft);
+  border: 1px solid color-mix(in srgb, var(--color-primary) 20%, transparent);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.btn-start:hover {
+  background: var(--color-primary);
+  color: #fff;
+}
+
+/* ── Agenda ───────────────────────────────────────────────────────────────── */
+.agenda-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 4px; }
+
+.agenda-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.agenda-time {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  min-width: 60px;
+  padding-top: 2px;
+  white-space: nowrap;
+}
+
+.agenda-dot-col { display: flex; align-items: flex-start; padding-top: 4px; }
+
+.agenda-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.agenda-dot--course { background: #3b82f6; }
+.agenda-dot--td, .agenda-dot--tp { background: #10b981; }
+.agenda-dot--exam { background: #a855f7; }
+.agenda-dot--study_session { background: #4f46e5; }
+.agenda-dot--task { background: #f59e0b; }
+.agenda-dot--break { background: #94a3b8; }
+.agenda-dot--personal { background: #ec4899; }
+.agenda-dot--other { background: #94a3b8; }
+
+.agenda-info { flex: 1; min-width: 0; }
+.agenda-title { font-size: 12px; font-weight: 600; color: var(--color-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.agenda-course { font-size: 10px; color: var(--color-text-muted); margin-top: 1px; }
+
+/* ── Habits ───────────────────────────────────────────────────────────────── */
+.habits-list { display: flex; flex-direction: column; gap: 12px; }
+
+.habit-row { }
+
+.habit-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.habit-icon-wrap { flex-shrink: 0; }
+
+.habit-label { flex: 1; font-size: 12px; font-weight: 500; color: var(--color-text); }
+
+.habit-count { font-size: 11px; font-weight: 700; color: var(--color-text-muted); white-space: nowrap; }
+
+.habit-bar-wrap {
+  height: 4px;
+  background: var(--color-border);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  margin-left: 28px;
+}
+
+.habit-bar {
+  height: 100%;
+  border-radius: var(--radius-full);
+  transition: width var(--transition-normal) var(--ease-smooth);
+}
+
+/* ── Activity ─────────────────────────────────────────────────────────────── */
+.activity-list { display: flex; flex-direction: column; gap: 10px; }
+
+.activity-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.activity-info { flex: 1; min-width: 0; }
+
+.activity-text {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.activity-time {
+  font-size: 10px;
+  color: var(--color-text-muted);
+  margin-top: 2px;
+}
+
+/* ── Modal ────────────────────────────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  background: var(--color-overlay);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.modal-box {
+  width: 100%;
+  max-width: 520px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-2xl);
+  box-shadow: var(--shadow-xl);
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.modal-box--sm { max-width: 380px; }
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 20px 16px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.modal-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.modal-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-lg);
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.modal-close:hover { background: var(--color-bg-soft); }
+
+.modal-body { padding: 16px 20px; display: flex; flex-direction: column; gap: 14px; }
+
+.modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 20px;
+  border-top: 1px solid var(--color-border);
+}
+
+.form-group { display: flex; flex-direction: column; gap: 5px; }
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.form-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-soft);
+}
+
+.form-input {
+  height: 40px;
+  padding: 0 12px;
+  font-size: 13px;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  outline: none;
+  width: 100%;
+  transition: border-color var(--transition-fast);
+}
+
+.form-input:focus { border-color: var(--color-primary); }
+
+.form-textarea {
+  height: auto;
+  padding: 10px 12px;
+  resize: vertical;
+  min-height: 64px;
+}
+
+.form-error {
+  font-size: 12px;
+  color: var(--color-danger);
+  font-weight: 500;
+}
+
+/* ── Error State ──────────────────────────────────────────────────────────── */
+.error-state-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 300px;
+  padding: 40px 24px;
+  text-align: center;
+}
+
+.error-state-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.error-state-msg {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  max-width: 480px;
+  line-height: 1.6;
+}
+
+.error-state-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
 }
 </style>
+
