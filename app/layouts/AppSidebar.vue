@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 const { get } = useApi()
@@ -45,26 +45,63 @@ const isRouteActive = (path: string) => {
   return route.path.startsWith(basePath)
 }
 
-async function handleSignOut() {
+const { logout } = useAuth()
+const isOpen = ref(false)
+const dropdownRef = ref<HTMLElement | null>(null)
+const chevronButtonRef = ref<HTMLElement | null>(null)
+const isLoggingOut = ref(false)
+
+const menuItems = [
+  { label: 'My Profile', icon: 'i-lucide-user', click: () => { isOpen.value = false; router.push('/settings/profile') } },
+  { label: 'Security', icon: 'i-lucide-shield', click: () => { isOpen.value = false; router.push('/settings/security') } },
+  { label: 'Notifications', icon: 'i-lucide-bell', click: () => { isOpen.value = false; router.push('/settings/notifications') } },
+  { label: 'Study Preferences', icon: 'i-lucide-settings-2', click: () => { isOpen.value = false; router.push('/settings/study-preferences') } },
+  { label: 'Billing', icon: 'i-lucide-credit-card', click: () => { isOpen.value = false; router.push('/settings/billing') } },
+  { label: 'Sign out', icon: 'i-lucide-log-out', click: handleSignOutClick }
+]
+
+async function handleSignOutClick(event: Event) {
+  event.preventDefault()
+  event.stopPropagation()
+  if (isLoggingOut.value) return
+  isLoggingOut.value = true
+  isOpen.value = false
   try {
-    await get<any>('/auth/logout')
-  } catch {}
-  localStorage.removeItem('token')
-  router.push('/login')
+    await logout()
+  } catch (err) {
+    console.error('Logout error:', err)
+  } finally {
+    isLoggingOut.value = false
+  }
 }
 
-const profileMenuItems = [
-  [
-    { label: 'My Profile', icon: 'i-lucide-user', click: () => router.push('/settings/profile') },
-    { label: 'Security', icon: 'i-lucide-shield', click: () => router.push('/settings/security') },
-    { label: 'Notifications', icon: 'i-lucide-bell', click: () => router.push('/settings/notifications') },
-    { label: 'Study Preferences', icon: 'i-lucide-settings-2', click: () => router.push('/settings/study-preferences') },
-    { label: 'Billing', icon: 'i-lucide-credit-card', click: () => router.push('/settings/billing') },
-  ],
-  [
-    { label: 'Sign out', icon: 'i-lucide-log-out', color: 'error' as const, click: handleSignOut },
-  ]
-]
+function handleClickOutside(event: MouseEvent) {
+  if (
+    isOpen.value &&
+    dropdownRef.value &&
+    !dropdownRef.value.contains(event.target as Node) &&
+    chevronButtonRef.value &&
+    !chevronButtonRef.value.contains(event.target as Node)
+  ) {
+    isOpen.value = false
+  }
+}
+
+function handleEscape(event: KeyboardEvent) {
+  if (event.key === 'Escape') {
+    isOpen.value = false
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('click', handleClickOutside)
+  document.addEventListener('keydown', handleEscape)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleClickOutside)
+  document.removeEventListener('keydown', handleEscape)
+})
 
 onMounted(async () => {
   try {
@@ -236,9 +273,38 @@ onMounted(async () => {
           </NuxtLink>
         </div>
 
-        <!-- Profile Card -->
-        <UDropdownMenu :items="profileMenuItems" :popper="{ placement: 'top-start' }">
-          <div class="flex items-center gap-3 rounded-[16px] border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-3 hover:bg-slate-50 dark:hover:bg-slate-800 transition cursor-pointer shadow-[0_2px_8px_-4px_rgba(0,0,0,0.05)]">
+        <!-- Profile Card & Custom Dropdown -->
+        <div class="relative w-full">
+          <!-- Dropdown Panel -->
+          <div
+            v-if="isOpen"
+            ref="dropdownRef"
+            class="absolute bottom-[calc(100%+8px)] left-0 right-0 z-50 bg-white dark:bg-slate-950 border border-slate-100 dark:border-slate-800 rounded-[14px] shadow-[0_4px_16px_rgba(15,23,42,0.08)] p-1.5 flex flex-col gap-0.5"
+            role="menu"
+            aria-label="User profile menu"
+          >
+            <button
+              v-for="item in menuItems"
+              :key="item.label"
+              class="flex items-center gap-2.5 px-3 rounded-[10px] text-[13px] font-semibold text-slate-700 dark:text-slate-350 hover:bg-[#f5f4fd] dark:hover:bg-indigo-950/30 hover:text-[#534bfa] dark:hover:text-indigo-400 transition-colors w-full text-left h-[38px] focus:outline-none"
+              :class="{ 'text-rose-600 dark:text-rose-450 hover:bg-rose-50 dark:hover:bg-rose-950/20 hover:text-rose-600 dark:hover:text-rose-400': item.label === 'Sign out' }"
+              role="menuitem"
+              @click="item.click"
+            >
+              <UIcon
+                :name="item.icon"
+                class="size-[16px] flex-shrink-0"
+                :class="item.label === 'Sign out' ? 'text-rose-500 dark:text-rose-400' : 'text-slate-500 dark:text-slate-400'"
+              />
+              <span>{{ item.label }}</span>
+            </button>
+          </div>
+
+          <!-- Profile Card -->
+          <div
+            @click="router.push('/settings/profile')"
+            class="flex items-center gap-3 rounded-[16px] border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-3 hover:bg-slate-50 dark:hover:bg-slate-800 transition cursor-pointer shadow-[0_2px_8px_-4px_rgba(0,0,0,0.05)]"
+          >
             <UAvatar
               v-if="user"
               :src="user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=random`"
@@ -262,21 +328,32 @@ onMounted(async () => {
               </p>
             </div>
 
-            <div class="size-6 flex items-center justify-center rounded-full bg-slate-50 dark:bg-slate-800 text-slate-400">
+            <button
+              ref="chevronButtonRef"
+              @click.stop="isOpen = !isOpen"
+              class="size-6 flex items-center justify-center rounded-full bg-slate-50 dark:bg-slate-800 text-slate-400 hover:text-slate-650 dark:hover:text-slate-200 transition-colors focus:outline-none"
+              aria-expanded="isOpen"
+              aria-haspopup="menu"
+              aria-label="Toggle user profile menu"
+            >
               <UIcon
                 name="i-lucide-chevron-up"
-                class="size-3.5"
+                class="size-3.5 transition-transform duration-250 ease-out"
+                :class="{ 'rotate-180': isOpen }"
               />
-            </div>
+            </button>
           </div>
-        </UDropdownMenu>
+        </div>
       </div>
     </div>
   </aside>
 </template>
 
 <style scoped>
-  .plan-card{
+p {
+  margin: 0;
+}
+.plan-card {
   margin-bottom: 6px;
-  }
+}
 </style>

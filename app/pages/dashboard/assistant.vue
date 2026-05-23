@@ -256,7 +256,7 @@ async function loadData() {
   if (import.meta.client) {
     const token = localStorage.getItem('accessToken') || localStorage.getItem('planify_token')
     if (!token) {
-      router.push('/login')
+      router.push('/auth/signin')
       return
     }
   }
