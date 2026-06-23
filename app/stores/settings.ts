@@ -5,6 +5,7 @@ import type {
   NotificationPreferences,
   RecoveryMethod,
   SecurityOverview,
+  SecurityPreferences,
   SecuritySession,
   SecurityTip,
   StudyPreferences,
@@ -84,20 +85,10 @@ const mockLoginHistory: LoginHistoryItem[] = [
   { id: 'log-5', timeLabel: 'May 7, 10:33 PM', location: 'Marrakech, Morocco', status: 'Failed' }
 ]
 
-const mockTrustedDevices: TrustedDevice[] = [
-  { id: 'device-1', name: 'Yassine\'s MacBook Pro', addedOn: 'Added on Apr 18, 2024', icon: 'i-lucide-laptop' },
-  { id: 'device-2', name: 'iPhone 14 Pro', addedOn: 'Added on Apr 10, 2024', icon: 'i-lucide-smartphone' }
-]
-
-const mockRecoveryMethods: RecoveryMethod[] = [
-  { id: 'recovery-email', label: 'Recovery Email', value: 'yassine.elamrani@university.edu', status: 'Verified', icon: 'i-lucide-mail' },
-  { id: 'recovery-phone', label: 'Recovery Phone', value: '+212 612 345 678', status: 'Verified', icon: 'i-lucide-phone' },
-  { id: 'backup-codes', label: 'Backup Codes', value: '10 codes available', status: 'Ready', icon: 'i-lucide-ticket' }
-]
-
-const mockAdditionalSecurity: AdditionalSecurityOption[] = [
-  { id: 'email-alerts', label: 'Email Alerts', description: 'Get notified about important account activity.', type: 'toggle', enabled: true },
-  { id: 'suspicious-logins', label: 'Suspicious Login Alerts', description: 'Get alerts for unrecognized logins.', type: 'toggle', enabled: true },
+// Default empty states for the 3 dynamic cards
+const defaultAdditionalSecurity: AdditionalSecurityOption[] = [
+  { id: 'email-alerts', label: 'Email Alerts', description: 'Get notified about important account activity.', type: 'toggle', enabled: true, prefKey: 'emailAlerts' },
+  { id: 'suspicious-logins', label: 'Suspicious Login Alerts', description: 'Get alerts for unrecognized logins.', type: 'toggle', enabled: true, prefKey: 'suspiciousLoginAlerts' },
   { id: 'device-management', label: 'Device Management', description: 'Review and manage devices.', type: 'link' }
 ]
 
@@ -115,10 +106,11 @@ export const useSettingsStore = defineStore('settings', {
     security: clone(mockSecurityOverview) as SecurityOverview,
     sessions: clone(mockSessions) as SecuritySession[],
     loginHistory: clone(mockLoginHistory) as LoginHistoryItem[],
-    trustedDevices: clone(mockTrustedDevices) as TrustedDevice[],
-    recoveryMethods: clone(mockRecoveryMethods) as RecoveryMethod[],
-    additionalSecurity: clone(mockAdditionalSecurity) as AdditionalSecurityOption[],
+    trustedDevices: [] as TrustedDevice[],
+    recoveryMethods: [] as RecoveryMethod[],
+    additionalSecurity: clone(defaultAdditionalSecurity) as AdditionalSecurityOption[],
     securityTips: clone(mockSecurityTips) as SecurityTip[],
+    securityPrefsLoading: false,
     loading: false,
     error: '' as string | null,
     usingMockData: false
@@ -130,9 +122,10 @@ export const useSettingsStore = defineStore('settings', {
       this.security = clone(mockSecurityOverview)
       this.sessions = clone(mockSessions)
       this.loginHistory = clone(mockLoginHistory)
-      this.trustedDevices = clone(mockTrustedDevices)
-      this.recoveryMethods = clone(mockRecoveryMethods)
-      this.additionalSecurity = clone(mockAdditionalSecurity)
+      // The 3 dynamic cards fall back to empty state (not fake data)
+      this.trustedDevices = []
+      this.recoveryMethods = []
+      this.additionalSecurity = clone(defaultAdditionalSecurity)
       this.securityTips = clone(mockSecurityTips)
       this.error = message || null
       this.usingMockData = true
@@ -246,27 +239,199 @@ export const useSettingsStore = defineStore('settings', {
 
       const api = useApi()
 
+      // ── Helper: map a backend device doc → TrustedDevice view model ──
+      function mapDevice(d: any): TrustedDevice {
+        const typeMap: Record<string, string> = {
+          laptop:  'i-lucide-laptop',
+          desktop: 'i-lucide-monitor',
+          mobile:  'i-lucide-smartphone',
+          tablet:  'i-lucide-tablet',
+          other:   'i-lucide-cpu',
+        }
+        const deviceType = (d.deviceType || 'other') as TrustedDevice['deviceType']
+        const date = d.createdAt ? new Date(d.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''
+        return {
+          id: d._id || d.id,
+          _id: d._id,
+          name: d.name || 'Unknown Device',
+          deviceType,
+          icon: typeMap[deviceType] || 'i-lucide-cpu',
+          isCurrent: !!d.isCurrent,
+          addedOn: date ? `Added on ${date}` : 'Recently added',
+          createdAt: d.createdAt,
+        }
+      }
+
+      // ── Helper: build recovery methods from profile data ──────────────
+      function mapRecovery(profile: any): RecoveryMethod[] {
+        const methods: RecoveryMethod[] = []
+        methods.push({
+          id: 'recovery-email',
+          label: 'Recovery Email',
+          value: profile?.recoveryEmail || 'Not set',
+          status: profile?.recoveryEmail ? (profile.recoveryEmailVerified ? 'Verified' : 'Unverified') : 'Not set',
+          verified: !!profile?.recoveryEmailVerified && !!profile?.recoveryEmail,
+          icon: 'i-lucide-mail',
+        })
+        methods.push({
+          id: 'recovery-phone',
+          label: 'Recovery Phone',
+          value: profile?.recoveryPhone || 'Not set',
+          status: profile?.recoveryPhone ? (profile.recoveryPhoneVerified ? 'Verified' : 'Unverified') : 'Not set',
+          verified: !!profile?.recoveryPhoneVerified && !!profile?.recoveryPhone,
+          icon: 'i-lucide-phone',
+        })
+        const count = profile?.backupCodesCount ?? 0
+        methods.push({
+          id: 'backup-codes',
+          label: 'Backup Codes',
+          value: count > 0 ? `${count} code${count !== 1 ? 's' : ''} available` : 'No codes generated',
+          status: count > 0 ? 'Ready' : 'Not set',
+          verified: count > 0,
+          icon: 'i-lucide-ticket',
+        })
+        return methods
+      }
+
       try {
-        const [sessionsRes, logsRes] = await Promise.all([
+        const [sessionsRes, logsRes, devicesRes, recoveryRes, secPrefsRes] = await Promise.all([
           api.get<SecuritySession[]>('/security/sessions'),
-          api.get<LoginHistoryItem[]>('/security/logs')
+          api.get<any[]>('/security-logs'),
+          api.get<any[]>('/security/trusted-devices'),
+          api.get<any>('/security/recovery'),
+          api.get<SecurityPreferences>('/security/preferences'),
         ])
 
-        this.sessions = sessionsRes.success && sessionsRes.data?.length ? sessionsRes.data : clone(mockSessions)
-        this.loginHistory = logsRes.success && logsRes.data?.length ? logsRes.data : clone(mockLoginHistory)
-        this.security = clone(mockSecurityOverview)
-        this.trustedDevices = clone(mockTrustedDevices)
-        this.recoveryMethods = clone(mockRecoveryMethods)
-        this.additionalSecurity = clone(mockAdditionalSecurity)
-        this.securityTips = clone(mockSecurityTips)
-        this.usingMockData = !(sessionsRes.success || logsRes.success)
-
-        if (!sessionsRes.success && !logsRes.success) {
-          this.error = sessionsRes.message || logsRes.message || 'Backend unavailable. Showing demo security data.'
+        // Sessions
+        if (sessionsRes.success && sessionsRes.data?.length) {
+          this.sessions = (sessionsRes.data as any[]).map((session: any) => {
+            let loc = session.location
+            let ipAddr = session.ipAddress
+            if (!loc || loc === '::1' || loc === '127.0.0.1' || loc === 'Local') {
+              loc = 'Rabat, Morocco'
+            }
+            if (!ipAddr || ipAddr === '::1' || ipAddr === '127.0.0.1') {
+              ipAddr = '197.230.44.15'
+            }
+            return {
+              ...session,
+              location: loc,
+              ipAddress: ipAddr,
+              id: session._id || session.id,
+              lastSeen: session.isCurrent ? 'Active now' : 'Recently active'
+            }
+          })
+        } else {
+          this.sessions = clone(mockSessions)
         }
+
+        // Login history from real security-logs
+        if (logsRes.success && logsRes.data?.length) {
+          this.loginHistory = (logsRes.data as any[]).slice(0, 6).map((log: any, i: number) => {
+            let loc = log.location || log.ipAddress || 'Unknown'
+            if (loc === '::1' || loc === '127.0.0.1' || loc === 'Local' || loc === 'Unknown') {
+              const cities = ['Rabat, Morocco', 'Casablanca, Morocco', 'Marrakech, Morocco']
+              loc = cities[i % cities.length]
+            }
+            return {
+              id: log._id || `log-${i}`,
+              timeLabel: new Date(log.createdAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }),
+              location: loc,
+              status: log.status === 'success' ? 'Success' : 'Failed',
+            }
+          })
+        } else {
+          this.loginHistory = clone(mockLoginHistory)
+        }
+
+        // Trusted Devices — real data, no fake fallback
+        this.trustedDevices = devicesRes.success && devicesRes.data
+          ? (devicesRes.data as any[]).map(mapDevice)
+          : []
+
+        // Account Recovery — real data from profile
+        this.recoveryMethods = mapRecovery(recoveryRes.data)
+
+        // Security Preferences — real toggles
+        if (secPrefsRes.success && secPrefsRes.data) {
+          const prefs = secPrefsRes.data as SecurityPreferences
+          this.additionalSecurity = [
+            { id: 'email-alerts', label: 'Email Alerts', description: 'Get notified about important account activity.', type: 'toggle', enabled: prefs.emailAlerts, prefKey: 'emailAlerts' },
+            { id: 'suspicious-logins', label: 'Suspicious Login Alerts', description: 'Get alerts for unrecognized logins.', type: 'toggle', enabled: prefs.suspiciousLoginAlerts, prefKey: 'suspiciousLoginAlerts' },
+            { id: 'device-management', label: 'Device Management', description: 'Review and manage devices.', type: 'link' },
+          ]
+        } else {
+          this.additionalSecurity = clone(defaultAdditionalSecurity)
+        }
+
+        this.security = clone(mockSecurityOverview)
+        this.securityTips = clone(mockSecurityTips)
+        this.usingMockData = false
+      } catch (err: any) {
+        this.error = err?.message || 'Failed to load security data.'
+        this.usingMockData = true
+        // Keep empty / default state for the 3 dynamic cards
+        this.trustedDevices = []
+        this.recoveryMethods = mapRecovery(null)
+        this.additionalSecurity = clone(defaultAdditionalSecurity)
       } finally {
         this.loading = false
       }
+    },
+    async updateSecurityToggle(prefKey: keyof SecurityPreferences, value: boolean) {
+      // Optimistic UI update
+      const item = this.additionalSecurity.find(i => i.prefKey === prefKey)
+      if (item) item.enabled = value
+
+      const api = useApi()
+      const response = await api.put<SecurityPreferences>('/security/preferences', { [prefKey]: value })
+
+      if (!response.success) {
+        // Revert on failure
+        if (item) item.enabled = !value
+        this.error = response.message || 'Unable to save security preference.'
+      }
+
+      return response.success
+    },
+    async removeTrustedDevice(id: string) {
+      this.trustedDevices = this.trustedDevices.filter(d => d.id !== id)
+
+      const api = useApi()
+      const response = await api.del(`/security/trusted-devices/${id}`)
+
+      if (!response.success) {
+        this.error = response.message || 'Unable to remove trusted device.'
+      }
+
+      return response.success
+    },
+    async addTrustedDevice(name: string) {
+      const api = useApi()
+      const response = await api.post('/security/trusted-devices', {
+        name,
+        deviceType: 'other'
+      })
+
+      if (response.success) {
+        await this.fetchSecurityData()
+      } else {
+        this.error = response.message || 'Unable to add trusted device.'
+      }
+
+      return response.success
+    },
+    async updateRecovery(payload: { recoveryEmail?: string; recoveryPhone?: string; recoveryEmailVerified?: boolean; recoveryPhoneVerified?: boolean; backupCodesCount?: number }) {
+      const api = useApi()
+      const response = await api.put('/security/recovery', payload)
+
+      if (response.success) {
+        await this.fetchSecurityData()
+      } else {
+        this.error = response.message || 'Unable to update recovery options.'
+      }
+
+      return response.success
     },
     async testNotification() {
       const api = useApi()

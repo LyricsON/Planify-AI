@@ -84,17 +84,28 @@ export interface LoginHistoryItem {
 
 export interface TrustedDevice {
   id: string
+  _id?: string
   name: string
-  addedOn: string
-  icon: string
+  addedOn: string         // formatted display string built on frontend
+  deviceType: 'desktop' | 'laptop' | 'mobile' | 'tablet' | 'other'
+  icon: string            // derived from deviceType
+  isCurrent: boolean
+  createdAt?: string
 }
 
 export interface RecoveryMethod {
   id: string
   label: string
   value: string
-  status: string
+  status: string          // 'Verified' | 'Not set' | 'Ready' etc.
+  verified: boolean
   icon: string
+}
+
+export interface SecurityPreferences {
+  emailAlerts: boolean
+  suspiciousLoginAlerts: boolean
+  deviceManagementEnabled: boolean
 }
 
 export interface AdditionalSecurityOption {
@@ -103,6 +114,7 @@ export interface AdditionalSecurityOption {
   description: string
   type: 'toggle' | 'link'
   enabled?: boolean
+  prefKey?: keyof SecurityPreferences  // links toggle to a backend field
 }
 
 export interface SecurityTip {
