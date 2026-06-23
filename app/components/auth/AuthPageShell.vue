@@ -8,48 +8,61 @@ defineProps<{
 </script>
 
 <template>
-  <div class="mx-auto flex min-h-screen w-full max-w-[1460px]">
-    <div class="relative hidden w-1/2 border-r border-[color-mix(in_srgb,var(--color-primary)_6%,transparent)] lg:flex">
-      <div class="absolute inset-0 bg-gradient-to-br from-[var(--color-primary-soft)] via-transparent to-transparent opacity-70" />
-      <div class="relative z-10 w-full">
+  <div class="grid grid-cols-1 lg:grid-cols-5 min-h-screen w-full">
+    <!-- Left Column (Visuals/Marketing) - 60% Width -->
+    <div class="lg:col-span-3 relative hidden border-r border-[#cbd5e1]/40 lg:flex bg-gradient-to-br from-[#f7f5ff] via-[#eef2ff] to-[#fafbff]">
+      <!-- Subtle decorative background shapes -->
+      <div class="absolute inset-0 overflow-hidden pointer-events-none">
+        <div class="absolute top-[20%] left-[10%] w-72 h-72 bg-purple-200/25 rounded-full filter blur-3xl" />
+        <div class="absolute bottom-[20%] right-[10%] w-96 h-96 bg-indigo-100/30 rounded-full filter blur-3xl" />
+        <div class="absolute top-1/4 right-1/4 w-2 h-2 bg-purple-400/40 rounded-full filter blur-sm animate-pulse" />
+        <div class="absolute bottom-1/3 left-1/3 w-3.5 h-3.5 bg-indigo-300/30 rounded-full filter blur-xs" />
+      </div>
+      <div class="relative z-10 w-full flex justify-center items-center">
         <AuthBrandPanel :mode="mode" />
       </div>
     </div>
 
+    <!-- Right Column (Forms) - 40% Width -->
     <div
-      class="flex w-full flex-1 justify-center px-6 py-8 sm:px-8 lg:w-1/2 lg:px-10 xl:px-14"
-      :class="align === 'start' ? 'items-start lg:pt-8' : 'items-center'"
+      class="lg:col-span-2 flex w-full justify-center px-6 py-8 sm:px-8 lg:px-10 xl:px-14 bg-[#fafbff]"
+      :class="align === 'start' ? 'items-start lg:pt-12 lg:pb-16' : 'items-center'"
     >
       <div
         class="w-full animate-slide-up"
-        :class="mode === 'signin' ? 'max-w-[560px]' : 'max-w-[530px]'"
+        :class="mode === 'signin' ? 'max-w-[540px]' : 'max-w-[530px]'"
       >
-        <div class="mb-7 flex items-center justify-center gap-3 lg:hidden">
-          <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--color-primary)] text-white shadow-sm">
-            <UIcon
-              name="i-lucide-sparkles"
-              class="h-5 w-5"
-            />
-          </div>
-          <span class="text-2xl font-bold tracking-tight text-[var(--color-text)]">Planify AI</span>
-        </div>
-
+        <!-- Card container -->
         <div
-          class="border border-[var(--color-border)] bg-[var(--color-card-bg)] shadow-[var(--shadow-card)]"
+          class="border border-[#e5e7eb] bg-white shadow-[0_10px_35px_rgba(15,23,42,0.03)]"
           :class="mode === 'signin' ? 'auth-card-signin' : 'rounded-[1.8rem] px-7 py-7 sm:px-10 sm:py-9'"
         >
           <div
             class="text-center"
             :class="mode === 'signin' ? 'auth-card-heading-signin' : 'mb-6 sm:mb-7'"
           >
+            <!-- Planify AI Logo at the top of the card for signin mode -->
+            <div v-if="mode === 'signin'" class="mb-6 flex items-center justify-center gap-2">
+              <div class="w-8 h-8 rounded-lg bg-[var(--color-primary)] flex items-center justify-center text-white shadow-sm">
+                <UIcon
+                  name="i-lucide-sparkles"
+                  class="w-5 h-5"
+                />
+              </div>
+              <span class="text-xl font-bold tracking-tight text-[#0f172a]">Planify AI</span>
+            </div>
+
+            <!-- Page Title -->
             <h1
-              class="font-extrabold leading-none text-[var(--color-text)]"
+              class="font-extrabold text-[#0f172a]"
               :class="mode === 'signin' ? 'auth-title-signin' : 'mb-2 text-[1.8rem] sm:text-[2.35rem]'"
             >
               {{ title }}
             </h1>
+            
+            <!-- Subtitle -->
             <p
-              class="text-[var(--color-text-muted)]"
+              class="text-[#475569]"
               :class="mode === 'signin' ? 'auth-subtitle-signin' : 'text-[0.92rem]'"
             >
               {{ subtitle }}
@@ -67,30 +80,33 @@ defineProps<{
 
 <style scoped>
 .auth-card-signin {
-  border-radius: 18px;
-  padding: 52px 54px 48px;
+  border-radius: 30px;
+  padding: 44px 48px;
 }
 
 .auth-card-heading-signin {
-  margin-bottom: 34px;
+  margin-bottom: 30px;
 }
 
 .auth-title-signin {
-  margin-bottom: 12px;
-  font-size: 34px;
+  margin-bottom: 10px;
+  font-size: 32px;
+  letter-spacing: -0.5px;
 }
 
 .auth-subtitle-signin {
-  font-size: 16px;
+  font-size: 15px;
+  line-height: 1.5;
 }
 
 @media (max-width: 640px) {
   .auth-card-signin {
-    padding: 34px 24px;
+    padding: 30px 24px;
+    border-radius: 24px;
   }
 
   .auth-title-signin {
-    font-size: 30px;
+    font-size: 26px;
   }
 }
 </style>

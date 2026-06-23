@@ -16,10 +16,10 @@ const iconBoxClass = computed(() => {
 
 <template>
   <div class="flex items-start gap-4">
-    <div :class="iconBoxClass">
+    <div :class="[iconBoxClass, '!w-12 !h-12 !rounded-xl']">
       <UIcon
         :name="icon"
-        class="w-5 h-5"
+        class="!w-6 !h-6"
       />
     </div>
     <div>
