@@ -81,16 +81,7 @@ async function testNotifications() {
 
 <template>
   <section class="mx-auto max-w-[1440px] space-y-6 pb-10">
-    <header class="space-y-2">
-      <h1 class="text-4xl font-semibold tracking-tight text-[var(--color-text)]">
-        Notification Settings
-      </h1>
-      <p class="text-base text-muted">
-        Choose how and when you want to be notified.
-      </p>
-    </header>
-
-    <SettingsTabs />
+        <SettingsTabs />
 
     <div
       v-if="usingMockData"
@@ -558,3 +549,4 @@ async function testNotifications() {
   color: var(--color-primary);
 }
 </style>
+

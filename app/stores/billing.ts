@@ -7,71 +7,115 @@ import type {
   TokenPack,
   TokenUsageCategory
 } from '~/types/billing'
+import type { ApiResponse } from '~/composables/useApi'
 
-function clone<T>(value: T): T {
-  return JSON.parse(JSON.stringify(value)) as T
+async function withTimeout<T>(promise: Promise<ApiResponse<T>>, timeoutMs = 12000): Promise<ApiResponse<T>> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined
+  const timeoutPromise = new Promise<ApiResponse<T>>((resolve) => {
+    timeoutId = setTimeout(() => {
+      resolve({ success: false, message: 'Request timed out' })
+    }, timeoutMs)
+  })
+
+  const result = await Promise.race([promise, timeoutPromise])
+  if (timeoutId) clearTimeout(timeoutId)
+  return result
 }
 
-const mockSubscription: SubscriptionPlan = {
-  id: 'student-plan',
-  name: 'Student Plan',
-  status: 'Active',
-  nextBillingDate: '12 May 2024',
-  billingCycle: 'Monthly',
-  feeLabel: '$9.99 / month',
-  description: 'Access to all core features and AI assistant.',
-  monthlyTokenLimit: 4000
-}
+function normalizeSubscription(payload: any): SubscriptionPlan | null {
+  if (!payload) return null
 
-const mockTokenBalance: TokenBalance = {
-  balance: 8750,
-  used: 3000,
-  limit: 4000,
-  usedPercentage: 75
-}
+  const price = Number(payload.price)
+  const currency = String(payload.currency || 'USD')
+  const planKey = String(payload.plan || '').toLowerCase()
+  const planName = payload.name || (planKey ? `${planKey.charAt(0).toUpperCase()}${planKey.slice(1)} Plan` : null)
 
-const mockTokenUsage: TokenUsageCategory[] = [
-  { id: 'assistant', label: 'AI Assistant (Answers)', tokens: 1250, percentage: 41 },
-  { id: 'docs', label: 'Document Analysis', tokens: 850, percentage: 28 },
-  { id: 'practice', label: 'Practice Exams', tokens: 650, percentage: 22 },
-  { id: 'flashcards', label: 'Flashcards & Summaries', tokens: 250, percentage: 9 }
-]
-
-const mockTokenPacks: TokenPack[] = [
-  { id: 'starter', name: 'Starter Pack', tokens: 2000, price: 4.99 },
-  { id: 'standard', name: 'Standard Pack', tokens: 5000, price: 9.99, popular: true },
-  { id: 'pro', name: 'Pro Pack', tokens: 12000, price: 19.99 },
-  { id: 'ultimate', name: 'Ultimate Pack', tokens: 25000, price: 34.99 }
-]
-
-const mockPaymentMethods: PaymentMethod[] = [
-  { id: 'pm_visa', brand: 'Visa', label: 'Visa ending in 4242', expiry: '04/27', isDefault: true },
-  { id: 'pm_mastercard', brand: 'Mastercard', label: 'Mastercard ending in 8888', expiry: '09/26', isDefault: false }
-]
-
-const mockPaymentHistory: PaymentHistoryItem[] = [
-  { id: 'payment-1', invoiceId: 'INV-2024-0056', date: '12 Apr 2024', description: 'Student Plan - Monthly', amount: '$9.99', status: 'Paid' },
-  { id: 'payment-2', invoiceId: 'INV-2024-0043', date: '12 Mar 2024', description: 'Student Plan - Monthly', amount: '$9.99', status: 'Paid' },
-  { id: 'payment-3', invoiceId: 'INV-2024-0031', date: '12 Feb 2024', description: 'Student Plan - Monthly', amount: '$9.99', status: 'Paid' }
-]
-
-const mockPricingPlans: PricingPlan[] = [
-  {
-    id: 'pro',
-    name: 'Pro Plan',
-    priceLabel: '$19.99 / month',
-    badge: 'Most Popular',
-    features: ['12,000 tokens per month', 'All Student Plan features', 'Priority support', 'Advanced analytics'],
-    cta: 'Upgrade to Pro'
-  },
-  {
-    id: 'free',
-    name: 'Free Plan',
-    priceLabel: '$0 / month',
-    features: ['500 tokens per month', 'AI Assistant (Limited)', 'Basic features'],
-    cta: 'Downgrade to Free'
+  return {
+    id: String(payload._id || payload.id || planKey || 'subscription'),
+    name: String(planName || 'Free Plan'),
+    status: String(payload.status || 'unknown'),
+    nextBillingDate: payload.nextBillingDate ? new Date(payload.nextBillingDate).toISOString() : '',
+    billingCycle: String(payload.billingCycle || 'none'),
+    feeLabel: Number.isFinite(price) && price > 0 ? `$${price.toFixed(2)} / ${payload.billingCycle || 'month'}` : '$0.00 / month',
+    description: String(payload.description || 'Billing details from your current subscription.'),
+    monthlyTokenLimit: Number(payload.tokenLimit || 0) || 0
   }
-]
+}
+
+function normalizeTokenBalance(payload: any, subscription: SubscriptionPlan | null): TokenBalance {
+  const balance = Number(payload?.tokenBalance ?? payload?.balance ?? 0)
+  const limit = Number(payload?.limit ?? subscription?.monthlyTokenLimit ?? 0)
+  const used = Number(payload?.used ?? (limit > 0 ? Math.max(0, limit - balance) : 0))
+  const usedPercentage = limit > 0 ? Math.round((used / limit) * 100) : 0
+
+  return {
+    balance: Number.isFinite(balance) ? balance : 0,
+    used: Number.isFinite(used) ? used : 0,
+    limit: Number.isFinite(limit) ? limit : 0,
+    usedPercentage: Number.isFinite(usedPercentage) ? Math.max(0, Math.min(100, usedPercentage)) : 0
+  }
+}
+
+function normalizeTokenUsage(items: unknown): TokenUsageCategory[] {
+  if (!Array.isArray(items)) return []
+
+  const total = items.reduce((sum: number, item: any) => sum + Math.abs(Number(item?.amount || item?.tokens || 0)), 0)
+
+  return items.slice(0, 8).map((item: any, index: number) => {
+    const amount = Math.abs(Number(item?.amount ?? item?.tokens ?? item?.usedTokens ?? 0))
+    const percentage = total > 0 ? Math.round((amount / total) * 100) : 0
+
+    return {
+      id: String(item?._id || item?.id || `usage-${index + 1}`),
+      label: String(item?.reason || item?.label || item?.name || 'Usage'),
+      tokens: Number.isFinite(amount) ? amount : 0,
+      percentage: Number.isFinite(percentage) ? percentage : 0
+    }
+  })
+}
+
+function normalizePayments(items: unknown): PaymentHistoryItem[] {
+  if (!Array.isArray(items)) return []
+
+  return items.map((payment: any, index: number) => {
+    const date = payment?.paidAt || payment?.createdAt
+    const dateLabel = date ? new Date(date).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' }) : 'Not available'
+
+    return {
+      id: String(payment?._id || payment?.id || `payment-${index + 1}`),
+      invoiceId: String(payment?.invoiceNumber || payment?.invoiceId || payment?._id || `INV-${index + 1}`),
+      date: dateLabel,
+      description: String(payment?.description || payment?.type || 'Payment'),
+      amount: typeof payment?.amount === 'number' ? `$${payment.amount.toFixed(2)}` : String(payment?.amount || '$0.00'),
+      status: String(payment?.status || 'paid')
+    }
+  })
+}
+
+function normalizePaymentMethods(items: unknown): PaymentMethod[] {
+  if (!Array.isArray(items)) return []
+
+  return items.map((method: any, index: number) => ({
+    id: String(method?._id || method?.id || `method-${index + 1}`),
+    brand: String(method?.brand || 'Card'),
+    label: String(method?.label || 'Saved card'),
+    expiry: String(method?.expiry || 'N/A'),
+    isDefault: Boolean(method?.isDefault)
+  }))
+}
+
+function normalizePlans(items: unknown): PricingPlan[] {
+  if (!Array.isArray(items)) return []
+
+  return items.map((plan: any, index: number) => ({
+    id: String(plan?.id || plan?.plan || `plan-${index + 1}`),
+    name: String(plan?.name || 'Plan'),
+    priceLabel: String(plan?.priceLabel || '$0 / month'),
+    badge: plan?.badge ? String(plan.badge) : undefined,
+    features: Array.isArray(plan?.features) ? plan.features.map((f: any) => String(f)) : [],
+    cta: String(plan?.cta || 'Choose Plan')
+  }))
+}
 
 export const useBillingStore = defineStore('billing', {
   state: () => ({
@@ -87,106 +131,110 @@ export const useBillingStore = defineStore('billing', {
     usingMockData: false
   }),
   actions: {
-    applyMockData(message?: string) {
-      this.subscription = clone(mockSubscription)
-      this.tokenBalance = clone(mockTokenBalance)
-      this.tokenUsage = clone(mockTokenUsage)
-      this.tokenPacks = clone(mockTokenPacks)
-      this.paymentMethods = clone(mockPaymentMethods)
-      this.paymentHistory = clone(mockPaymentHistory)
-      this.pricingPlans = clone(mockPricingPlans)
-      this.error = message || null
-      this.usingMockData = true
-    },
     async fetchBilling() {
       this.loading = true
       this.error = null
       const api = useApi()
 
       try {
-        const [subscriptionRes, balanceRes, historyRes, paymentMethodsRes, tokenHistoryRes] = await Promise.all([
-          api.get<Partial<SubscriptionPlan>>('/subscriptions/me'),
-          api.get<Partial<TokenBalance>>('/tokens/balance'),
-          api.get<PaymentHistoryItem[]>('/payments/history'),
-          api.get<PaymentMethod[]>('/payments/methods'),
-          api.get<TokenUsageCategory[]>('/tokens/history')
+        const [subscriptionRes, balanceRes, historyRes, paymentMethodsRes, tokenHistoryRes, tokenPacksRes, plansRes] = await Promise.all([
+          withTimeout(api.get<any>('/subscriptions/me')),
+          withTimeout(api.get<any>('/tokens/balance')),
+          withTimeout(api.get<any>('/payments')),
+          withTimeout(api.get<any>('/payments/methods')),
+          withTimeout(api.get<any>('/tokens/history')),
+          withTimeout(api.get<any>('/tokens/packs')),
+          withTimeout(api.get<any>('/subscriptions/plans'))
         ])
 
-        if (!subscriptionRes.success && !balanceRes.success) {
-          throw new Error(subscriptionRes.message || balanceRes.message || 'Billing request failed')
+        this.subscription = normalizeSubscription(subscriptionRes.success ? subscriptionRes.data : null)
+        this.tokenBalance = normalizeTokenBalance(balanceRes.success ? balanceRes.data : null, this.subscription)
+        this.tokenUsage = normalizeTokenUsage(tokenHistoryRes.success ? ((tokenHistoryRes.data as any)?.data || tokenHistoryRes.data) : [])
+        this.tokenPacks = Array.isArray((tokenPacksRes.data as any)?.data)
+          ? (tokenPacksRes.data as any).data
+          : Array.isArray(tokenPacksRes.data)
+            ? tokenPacksRes.data as TokenPack[]
+            : []
+        this.paymentMethods = normalizePaymentMethods(paymentMethodsRes.success ? ((paymentMethodsRes.data as any)?.data || paymentMethodsRes.data) : [])
+        this.paymentHistory = normalizePayments(historyRes.success ? ((historyRes.data as any)?.data || historyRes.data) : [])
+        this.pricingPlans = normalizePlans(plansRes.success ? ((plansRes.data as any)?.data || plansRes.data) : [])
+
+        const hardFailures = [subscriptionRes, balanceRes].filter((r) => !r.success)
+        const softFailures = [historyRes, paymentMethodsRes, tokenHistoryRes, tokenPacksRes, plansRes].filter((r) => !r.success)
+
+        if (hardFailures.length) {
+          this.error = hardFailures[0]?.message || 'Unable to load required billing data.'
+        } else if (softFailures.length) {
+          this.error = 'Some billing sections are unavailable. Showing database data where available.'
         }
 
-        this.subscription = subscriptionRes.success ? { ...clone(mockSubscription), ...subscriptionRes.data } : clone(mockSubscription)
-        this.tokenBalance = balanceRes.success
-          ? {
-              ...clone(mockTokenBalance),
-              ...balanceRes.data,
-              usedPercentage: balanceRes.data?.usedPercentage || Math.round(((balanceRes.data?.used || mockTokenBalance.used) / (balanceRes.data?.limit || mockTokenBalance.limit)) * 100)
-            }
-          : clone(mockTokenBalance)
-        this.tokenUsage = tokenHistoryRes.success && tokenHistoryRes.data?.length ? tokenHistoryRes.data : clone(mockTokenUsage)
-        this.tokenPacks = clone(mockTokenPacks)
-        this.paymentMethods = paymentMethodsRes.success && paymentMethodsRes.data?.length ? paymentMethodsRes.data : clone(mockPaymentMethods)
-        this.paymentHistory = historyRes.success && historyRes.data?.length ? historyRes.data : clone(mockPaymentHistory)
-        this.pricingPlans = clone(mockPricingPlans)
         this.usingMockData = false
       } catch (error: any) {
-        this.applyMockData(error?.message || 'Backend unavailable. Showing demo billing data.')
+        this.error = error?.message || 'Unable to load billing data.'
       } finally {
         this.loading = false
       }
     },
+
     async buyTokenPack(packId: string) {
       const pack = this.tokenPacks.find(item => item.id === packId)
-
-      if (!pack || !this.tokenBalance) {
+      if (!pack) {
+        this.error = 'Selected token pack was not found.'
         return false
       }
 
-      this.tokenBalance.balance += pack.tokens
-
       const api = useApi()
-      const response = await api.post('/tokens/buy-demo', {
-        packId
-      })
+      const [tokenRes, paymentRes] = await Promise.all([
+        api.post('/tokens/buy-demo', { amount: pack.tokens }),
+        api.post('/payments/demo', {
+          amount: pack.price,
+          type: 'token_pack',
+          description: `${pack.name} (${pack.tokens.toLocaleString()} tokens)`,
+          tokenAmount: pack.tokens
+        })
+      ])
 
-      if (!response.success) {
-        this.error = response.message || 'Unable to complete token purchase.'
+      if (!tokenRes.success || !paymentRes.success) {
+        this.error = tokenRes.message || paymentRes.message || 'Unable to complete token purchase.'
       }
 
-      return response.success || true
+      return tokenRes.success && paymentRes.success
     },
-    async addPaymentMethod(payload: { brand: string, label: string, expiry: string }) {
-      const newMethod: PaymentMethod = {
-        id: `pm_${Date.now()}`,
-        brand: payload.brand,
-        label: payload.label,
-        expiry: payload.expiry,
-        isDefault: false
+
+    async upgradePlan(planId = 'pro') {
+      const api = useApi()
+      const response = await api.post('/subscriptions/demo-upgrade', { plan: planId, billingCycle: 'monthly' })
+      if (!response.success) {
+        this.error = response.message || 'Unable to upgrade plan.'
       }
+      return response.success
+    },
 
-      this.paymentMethods = [...this.paymentMethods, newMethod]
+    async cancelPlan() {
+      const api = useApi()
+      const response = await api.post('/subscriptions/cancel-demo')
+      if (!response.success) {
+        this.error = response.message || 'Unable to cancel plan.'
+      }
+      return response.success
+    },
 
+    async addPaymentMethod(payload: { brand: string, label: string, expiry: string }) {
       const api = useApi()
       const response = await api.post('/payments/methods', payload)
-
       if (!response.success) {
         this.error = response.message || 'Unable to add payment method.'
       }
-
-      return response.success || true
+      return response.success
     },
-    async removePaymentMethod(id: string) {
-      this.paymentMethods = this.paymentMethods.filter(method => method.id !== id)
 
+    async removePaymentMethod(id: string) {
       const api = useApi()
       const response = await api.del(`/payments/methods/${id}`)
-
       if (!response.success) {
         this.error = response.message || 'Unable to remove payment method.'
       }
-
-      return response.success || true
+      return response.success
     }
   }
 })

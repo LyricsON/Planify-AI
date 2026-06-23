@@ -28,15 +28,12 @@ const toneBar = {
           Study Goals
         </h3>
       </div>
-      <button
-        type="button"
-        class="text-sm font-semibold text-[var(--color-primary)]"
-      >
-        View all
-      </button>
     </div>
 
-    <div class="space-y-4">
+    <div
+      v-if="goals.length"
+      class="space-y-4"
+    >
       <div
         v-for="goal in goals"
         :key="goal.id"
@@ -56,6 +53,12 @@ const toneBar = {
         </div>
       </div>
     </div>
+    <p
+      v-else
+      class="text-sm text-muted"
+    >
+      No study goals added yet.
+    </p>
 
     <button
       type="button"

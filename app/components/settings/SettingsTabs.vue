@@ -1,5 +1,6 @@
 <script setup lang="ts">
 const route = useRoute()
+const router = useRouter()
 
 const tabs = [
   { label: 'Personal Info', icon: 'i-lucide-user', to: '/settings/profile' },
@@ -9,7 +10,18 @@ const tabs = [
   { label: 'Billing', icon: 'i-lucide-credit-card', to: '/settings/billing' }
 ]
 
-const isActive = (path: string) => route.path === path
+const isActive = (path: string) => {
+  if (path === '/settings/profile' && route.path === '/settings/personal-info') {
+    return true
+  }
+  return route.path === path
+}
+
+function navigateTo(path: string) {
+  if (route.path !== path) {
+    router.push(path)
+  }
+}
 </script>
 
 <template>
@@ -19,8 +31,9 @@ const isActive = (path: string) => route.path === path
         v-for="tab in tabs"
         :key="tab.to"
         :to="tab.to"
-        class="relative inline-flex items-center gap-2 px-4 py-4 text-sm font-semibold transition"
-        :class="isActive(tab.to) ? 'text-[var(--color-primary)]' : 'text-[var(--color-text-soft)] hover:text-[var(--color-text)]'"
+        @click.prevent="navigateTo(tab.to)"
+        class="relative inline-flex items-center gap-2 px-4 py-4 text-sm font-semibold transition no-underline"
+        :class="isActive(tab.to) ? '!text-[var(--color-primary)]' : '!text-[var(--color-text)] hover:!text-[var(--color-primary)]'"
       >
         <UIcon
           :name="tab.icon"

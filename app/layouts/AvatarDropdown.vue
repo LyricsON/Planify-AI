@@ -1,4 +1,6 @@
 <script setup lang="ts">
+const { logout } = useAuth()
+
 const items = [
   [
     {
@@ -7,19 +9,9 @@ const items = [
       to: '/settings/profile'
     },
     {
-      label: 'Security',
-      icon: 'i-lucide-shield',
-      to: '/settings/security'
-    },
-    {
-      label: 'Notifications',
-      icon: 'i-lucide-bell',
-      to: '/settings/notifications'
-    },
-    {
-      label: 'Study Preferences',
+      label: 'Settings',
       icon: 'i-lucide-settings-2',
-      to: '/settings/study-preferences'
+      to: '/settings/security'
     },
     {
       label: 'Billing',
@@ -31,7 +23,10 @@ const items = [
     {
       label: 'Sign out',
       icon: 'i-lucide-log-out',
-      color: 'error'
+      color: 'error',
+      onSelect: async () => {
+        await logout()
+      }
     }
   ]
 ] as any
@@ -39,10 +34,8 @@ const items = [
 
 <template>
   <UDropdownMenu :items="items">
-    <button class="flex items-center gap-2 rounded-full border border-slate-200 bg-white p-1 pr-2 transition hover:bg-slate-50">
+    <button class="flex items-center gap-2 rounded-full border border-slate-200 bg-white p-1 pr-2 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700">
       <UAvatar
-        src="https://i.pravatar.cc/100?img=12"
-        alt="Yassine"
         size="sm"
       />
 

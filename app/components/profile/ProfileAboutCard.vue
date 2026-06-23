@@ -20,11 +20,23 @@ defineProps<{
       </h3>
     </div>
 
-    <p class="text-base leading-7 text-[var(--color-text-soft)]">
+    <p
+      v-if="profile.bio"
+      class="text-base leading-7 text-[var(--color-text-soft)]"
+    >
       {{ profile.bio }}
     </p>
+    <p
+      v-else
+      class="text-sm text-muted"
+    >
+      Add a short bio to personalize your profile.
+    </p>
 
-    <div class="mt-6 flex flex-wrap gap-2">
+    <div
+      v-if="profile.tags.length"
+      class="mt-6 flex flex-wrap gap-2"
+    >
       <span
         v-for="tag in profile.tags"
         :key="tag"

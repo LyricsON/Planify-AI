@@ -39,10 +39,10 @@ const emit = defineEmits<{
             <h2 class="text-3xl font-semibold text-[var(--color-text)]">
               {{ user.name }}
             </h2>
-            <span class="status-badge status-info">{{ user.role }}</span>
+            <span class="status-badge status-info">{{ user.role || 'Student' }}</span>
           </div>
           <p class="mt-2 text-lg text-[var(--color-text-soft)]">
-            {{ profile.headline }}
+            {{ profile.headline || 'Student' }}
           </p>
           <div class="mt-4 flex flex-col gap-2 text-sm text-muted">
             <div class="flex items-center justify-center gap-2 sm:justify-start">
@@ -50,7 +50,7 @@ const emit = defineEmits<{
                 name="i-lucide-map-pin"
                 class="size-4 text-[var(--color-primary)]"
               />
-              <span>{{ user.location }}</span>
+              <span>{{ user.location || 'Location not added yet' }}</span>
             </div>
             <div class="flex items-center justify-center gap-2 sm:justify-start">
               <UIcon

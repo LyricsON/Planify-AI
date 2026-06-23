@@ -19,15 +19,12 @@ const toneClass = {
       <h3 class="text-xl font-semibold text-[var(--color-text)]">
         Achievements
       </h3>
-      <button
-        type="button"
-        class="text-sm font-semibold text-[var(--color-primary)]"
-      >
-        View all
-      </button>
     </div>
 
-    <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div
+      v-if="achievements.length"
+      class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
+    >
       <article
         v-for="achievement in achievements"
         :key="achievement.id"
@@ -47,5 +44,11 @@ const toneClass = {
         </p>
       </article>
     </div>
+    <p
+      v-else
+      class="text-sm text-muted"
+    >
+      No achievements yet. Keep studying and completing tasks.
+    </p>
   </section>
 </template>

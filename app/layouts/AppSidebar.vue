@@ -10,6 +10,11 @@ const user = ref<any>(null)
 const tokenBalance = ref<number | null>(null)
 const plan = ref<any>(null)
 
+function toNumber(value: unknown): number | null {
+  const n = Number(value)
+  return Number.isFinite(n) ? n : null
+}
+
 const navItems = [
   { label: 'Home', icon: 'i-lucide-home', to: '/dashboard' },
   { label: 'Schedule', icon: 'i-lucide-calendar-days', to: '/dashboard/schedule' },
@@ -111,9 +116,20 @@ onMounted(async () => {
       get<any>('/subscriptions/me')
     ])
 
-    if (meRes.success && meRes.data) user.value = meRes.data
-    if (tokenRes.success && tokenRes.data) tokenBalance.value = tokenRes.data.tokenBalance
-    if (subRes.success && subRes.data) plan.value = subRes.data.plan
+    const meData = meRes.success ? (meRes.data as any) : null
+    const subData = subRes.success ? (subRes.data as any) : null
+    const tokenData = tokenRes.success ? (tokenRes.data as any) : null
+
+    user.value = meData?.user || meData?.data || meData || null
+
+    tokenBalance.value = toNumber(
+      tokenData?.tokenBalance
+      ?? tokenData?.balance
+      ?? tokenData?.available
+      ?? tokenData?.tokens
+    )
+
+    plan.value = subData?.planName || subData?.plan || subData?.name || 'Free'
   } catch (err) {
     console.error('Sidebar fetch error', err)
   }
@@ -324,7 +340,7 @@ onMounted(async () => {
                 {{ user ? user.name : 'Loading...' }}
               </p>
               <p class="text-[11px] font-bold text-slate-500 dark:text-slate-400 capitalize truncate mt-0.5">
-                {{ plan ? plan + ' Plan' : 'Student Plan' }}
+                {{ plan ? `${plan} Plan` : 'Free Plan' }}
               </p>
             </div>
 

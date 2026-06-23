@@ -2,10 +2,10 @@ export interface ProfileUser {
   id: string
   name: string
   email: string
-  avatar: string
-  phone: string
-  location: string
-  role: string
+  avatar?: string
+  phone?: string
+  location?: string
+  role?: string
 }
 
 export interface ProfileChecklistItem {
@@ -15,16 +15,16 @@ export interface ProfileChecklistItem {
 }
 
 export interface AcademicInformation {
-  university: string
-  fieldOfStudy: string
-  academicYear: string
-  studentId: string
-  gpa: string
+  university?: string
+  fieldOfStudy?: string
+  academicYear?: string
+  studentId?: string
+  gpa?: string
 }
 
 export interface ProfileDetails {
-  headline: string
-  bio: string
+  headline?: string
+  bio?: string
   completion: number
   tags: string[]
   academic: AcademicInformation
@@ -62,21 +62,22 @@ export interface ActivityItem {
   timeAgo: string
   icon: string
   tone: 'success' | 'info' | 'primary' | 'warning'
+  date: string
 }
 
 export interface ProfileSubscription {
   name: string
   status: string
-  nextBillingDate: string
-  billingCycle: string
-  priceLabel: string
+  nextBillingDate?: string
+  billingCycle?: string
+  priceLabel?: string
 }
 
 export interface TokenUsage {
   balance: number
-  limit: number
-  resetDate: string
-  usedPercentage: number
+  limit?: number
+  resetDate?: string
+  usedPercentage?: number
   used?: number
 }
 
@@ -105,4 +106,41 @@ export interface ProfilePayload {
   fieldOfStudy: string
   academicYear: string
   studentId: string
+}
+
+export interface Task {
+  id: string
+  title?: string
+  status?: string
+  completedAt?: string
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface Course {
+  id: string
+  title?: string
+  status?: string
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface StudySession {
+  id: string
+  title?: string
+  status?: string
+  durationMinutes?: number
+  duration?: number
+  startedAt?: string
+  completedAt?: string
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface FileItem {
+  id: string
+  name?: string
+  filename?: string
+  createdAt?: string
+  updatedAt?: string
 }

@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import AvatarDropdown from './AvatarDropdown.vue'
-
 const { get } = useApi()
 const user = ref<any>(null)
 const route = useRoute()
@@ -55,6 +53,30 @@ const pageHeaders: Record<string, { title: string; subtitle: string; icon?: stri
     icon: 'i-lucide-chart-column',
     iconClass: 'analytics-icon-container',
   },
+  '/settings/profile': {
+    title: 'Profile',
+    subtitle: 'Manage your account, preferences and track your progress.',
+  },
+  '/settings/personal-info': {
+    title: 'Profile Settings',
+    subtitle: 'Manage your account, preferences, and subscription.',
+  },
+  '/settings/security': {
+    title: 'Security',
+    subtitle: 'Manage your account security and active sessions.',
+  },
+  '/settings/notifications': {
+    title: 'Notifications',
+    subtitle: 'Control your alerts and communication preferences.',
+  },
+  '/settings/study-preferences': {
+    title: 'Study Preferences',
+    subtitle: 'Customize your learning and assistant preferences.',
+  },
+  '/settings/billing': {
+    title: 'Billing',
+    subtitle: 'Manage your plan, payments and token usage.',
+  },
 }
 
 const currentHeader = computed(() => {
@@ -87,7 +109,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <header class="sticky top-0 z-30 bg-slate-50 dark:bg-slate-950 px-5 py-3">
+  <header class="sticky top-0 z-30 bg-slate-50 dark:bg-slate-950 px-5 pt-3 pb-6">
     <div class="flex items-center justify-between gap-4">
       <!-- Left: Dynamic page header or greeting -->
       <div>
@@ -101,7 +123,7 @@ onMounted(async () => {
                 {{ currentHeader.title }}
               </h1>
             </div>
-            <p class="text-[14px] text-slate-500 dark:text-slate-400 font-medium mt-1.5">
+            <p class="topbar-subtitle mb-0 text-[14px] text-slate-500 dark:text-slate-400 font-medium mt-1.5">
               {{ currentHeader.subtitle }}
             </p>
           </div>
@@ -110,7 +132,7 @@ onMounted(async () => {
           <h1 class="text-[24px] font-bold text-slate-900 dark:text-white leading-tight">
             {{ greeting }}, {{ user?.name?.split(' ')[0] || 'User' }}! 👋
           </h1>
-          <p class="text-[14px] text-slate-500 dark:text-slate-400 font-medium mt-0.5">
+          <p class="topbar-subtitle mb-0 text-[14px] text-slate-500 dark:text-slate-400 font-medium mt-0.5">
             Let's make today productive and focused.
           </p>
         </template>
@@ -153,6 +175,10 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+.topbar-subtitle {
+  margin-bottom: 0 !important;
+}
+
 .sparkle-icon-container,
 .schedule-icon-container,
 .courses-icon-container,

@@ -71,16 +71,7 @@ async function savePreferences() {
 
 <template>
   <section class="mx-auto max-w-[1440px] space-y-6 pb-10">
-    <header class="space-y-2">
-      <h1 class="text-4xl font-semibold tracking-tight text-[var(--color-text)]">
-        Profile Settings
-      </h1>
-      <p class="text-base text-muted">
-        Manage your account, preferences, and subscription.
-      </p>
-    </header>
-
-    <SettingsTabs />
+        <SettingsTabs />
 
     <div
       v-if="usingMockData"
@@ -566,3 +557,4 @@ async function savePreferences() {
   color: var(--color-text);
 }
 </style>
+
