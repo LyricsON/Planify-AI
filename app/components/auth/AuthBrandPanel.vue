@@ -35,22 +35,25 @@ const features = [
 </script>
 
 <template>
-  <div class="flex h-full w-full flex-col justify-between py-12 px-8 lg:px-12 xl:py-16 xl:px-20 text-[var(--color-text)]">
+  <div class="flex h-full w-full flex-col justify-start gap-4 py-12 px-8 lg:px-12 xl:py-16 xl:px-20 text-[var(--color-text)]">
     <!-- Top Hero Text -->
     <div class="w-full flex flex-col">
       <div class="animate-slide-up" style="animation-delay: 100ms">
-        <h1 class="text-[2.6rem] font-extrabold leading-[1.1] tracking-tight text-[var(--color-text)] xl:text-[3.25rem]">
+        <h1 class="mb-3 text-[2.6rem] font-extrabold leading-[1.1] tracking-tight text-[var(--color-text)] xl:mb-3 xl:text-[3.25rem]">
           <span class="text-[var(--color-primary)]">Smarter</span> planning.<br>
           <span class="text-[var(--color-primary)] font-extrabold bg-gradient-to-r from-[var(--color-primary)] to-[var(--color-ai)] bg-clip-text text-transparent">Better</span> results.
         </h1>
-        <p class="mt-4 max-w-[28rem] text-[0.95rem] leading-[1.6] text-[var(--color-text-muted)] xl:text-[1.05rem]">
+        <p
+          class="mt-2 max-w-[28rem] text-[1rem] text-[var(--color-text-muted)] xl:text-[1rem]"
+          style="line-height: 1.4"
+        >
           Planify AI helps students plan, focus, and achieve more with AI-powered study plans.
         </p>
       </div>
     </div>
 
     <!-- Middle: Features List & Workspace Illustration split -->
-    <div class="grid grid-cols-1 xl:grid-cols-12 gap-8 items-center mt-6 w-full h-full relative">
+    <div class="grid w-full grid-cols-1 items-center gap-8 relative xl:grid-cols-12 mt-0">
       <!-- Features List (Left 5 cols on large desktop) -->
       <div class="xl:col-span-5 flex flex-col gap-6 animate-slide-up" style="animation-delay: 200ms">
         <div v-for="(feature, idx) in features" :key="idx" class="flex items-start gap-4">
@@ -58,8 +61,8 @@ const features = [
             <UIcon :name="feature.icon" class="w-5 h-5" />
           </div>
           <div>
-            <h3 class="text-[0.98rem] font-semibold text-[var(--color-text)]">{{ feature.title }}</h3>
-            <p class="text-[0.88rem] leading-[1.5] text-[var(--color-text-muted)] mt-0.5">{{ feature.description }}</p>
+            <h3 class="feature-title">{{ feature.title }}</h3>
+            <p class="feature-subtitle">{{ feature.description }}</p>
           </div>
         </div>
       </div>
@@ -71,3 +74,19 @@ const features = [
     </div>
   </div>
 </template>
+
+<style scoped>
+.feature-title {
+  font-size: 14px !important;
+  line-height: 1.2;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.feature-subtitle {
+  margin-top: 2px;
+  font-size: 12px;
+  line-height: 1.4 !important;
+  color: var(--color-text-muted);
+}
+</style>

@@ -184,10 +184,28 @@ const onGoogleClick = () => {
         class="signin-google"
         @click="onGoogleClick"
       >
-        <UIcon
-          name="i-simple-icons-google"
+        <svg
           class="signin-google-icon"
-        />
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+        >
+          <path
+            fill="#4285F4"
+            d="M21.805 12.226c0-.783-.07-1.536-.198-2.266H12v4.293h5.507a4.714 4.714 0 0 1-2.047 3.094v2.569h3.31c1.934-1.782 3.035-4.41 3.035-7.69z"
+          />
+          <path
+            fill="#34A853"
+            d="M12 22c2.77 0 5.094-.918 6.792-2.486l-3.31-2.569c-.918.616-2.093.983-3.482.983-2.67 0-4.935-1.802-5.742-4.226H2.825v2.654A10 10 0 0 0 12 22z"
+          />
+          <path
+            fill="#FBBC05"
+            d="M6.258 13.702A5.99 5.99 0 0 1 6.1 12c0-.592.102-1.165.286-1.702V7.644H2.825A10 10 0 0 0 2 12c0 1.594.38 3.1 1.044 4.456l3.214-2.754z"
+          />
+          <path
+            fill="#EA4335"
+            d="M12 5.982c1.508 0 2.86.518 3.927 1.536l2.944-2.944C17.09 2.905 14.767 2 12 2a9.97 9.97 0 0 0-9.175 5.644l3.433 2.656C7.065 7.784 9.33 5.982 12 5.982z"
+          />
+        </svg>
         <span>Continue with Google</span>
       </button>
 
@@ -257,10 +275,10 @@ const onGoogleClick = () => {
   display: flex;
   align-items: center;
   gap: 12px;
-  height: 58px;
+  height: 40px;
   padding: 0 18px;
   border: 1px solid #cbd5e1;
-  border-radius: 14px;
+  border-radius: 8px;
   background: #ffffff;
   box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.01);
   transition: border-color var(--transition-fast) var(--ease-out), box-shadow var(--transition-fast) var(--ease-out);
@@ -285,7 +303,7 @@ const onGoogleClick = () => {
   outline: 0;
   background: transparent;
   color: #0f172a;
-  font-size: 15.5px;
+  font-size: 14px;
 }
 
 .signin-input-control::placeholder {
@@ -341,7 +359,7 @@ input:-webkit-autofill:active {
 
 .signin-link {
   color: #4f46e5;
-  font-size: 14.5px;
+  font-size: 12px;
   font-weight: 600;
   text-decoration: none;
   transition: color var(--transition-fast) var(--ease-out);
@@ -356,11 +374,11 @@ input:-webkit-autofill:active {
   align-items: center;
   justify-content: center;
   position: relative;
-  height: 58px;
-  border-radius: 14px;
+  height: 40px;
+  border-radius: 8px;
   background: linear-gradient(90deg, #4f46e5 0%, #7c3aed 100%);
   color: #ffffff;
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 700;
   box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);
   transition: transform var(--transition-fast) var(--ease-out), opacity var(--transition-fast) var(--ease-out), box-shadow var(--transition-fast) var(--ease-out);
@@ -408,21 +426,23 @@ input:-webkit-autofill:active {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  height: 58px;
+  gap: 10px;
+  height: 40px;
   border: 1.5px solid #cbd5e1;
-  border-radius: 14px;
+  border-radius: 8px;
   background: #ffffff;
   color: #0f172a;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  transition: background var(--transition-fast) var(--ease-out), border-color var(--transition-fast) var(--ease-out), transform var(--transition-fast) var(--ease-out);
+  transition: background var(--transition-fast) var(--ease-out), border-color var(--transition-fast) var(--ease-out), color var(--transition-fast) var(--ease-out), box-shadow var(--transition-fast) var(--ease-out), transform var(--transition-fast) var(--ease-out);
 }
 
 .signin-google:hover {
-  background: #f8fafc;
-  border-color: #94a3b8;
+  background: linear-gradient(90deg, rgba(79, 70, 229, 0.06), rgba(124, 58, 237, 0.06));
+  border-color: #7c3aed;
+  color: #4f46e5;
+  box-shadow: 0 8px 18px rgba(79, 70, 229, 0.12);
 }
 
 .signin-google:active {
@@ -430,14 +450,15 @@ input:-webkit-autofill:active {
 }
 
 .signin-google-icon {
-  width: 20px;
-  height: 20px;
+  width: 21px;
+  height: 21px;
+  flex-shrink: 0;
 }
 
 .signin-footer {
   color: #64748b;
   text-align: center;
-  font-size: 14.5px;
+  font-size: 12px;
   margin-top: 4px;
 }
 </style>
