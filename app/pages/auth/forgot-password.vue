@@ -5,7 +5,7 @@ definePageMeta({
   layout: 'auth'
 })
 
-const { post } = useApi()
+const { sendPasswordReset } = useFirebaseAuth()
 
 const form = reactive({
   email: ''
@@ -21,18 +21,11 @@ const onSubmit = async () => {
   isLoading.value = true
 
   try {
-    const response = await post('/auth/forgot-password', {
-      email: form.email.trim().toLowerCase()
-    })
-
-    if (!response.success) {
-      errorMessage.value = response.message || 'Unable to send reset instructions. Please try again.'
-      return
-    }
+    await sendPasswordReset(form.email.trim().toLowerCase())
 
     await navigateTo(`/auth/verification?email=${encodeURIComponent(form.email.trim().toLowerCase())}`)
-  } catch {
-    errorMessage.value = 'Unable to reach the server. Check that the backend is running and try again.'
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : 'Unable to send reset instructions. Please try again.'
   } finally {
     isLoading.value = false
   }

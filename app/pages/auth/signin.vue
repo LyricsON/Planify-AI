@@ -5,8 +5,8 @@ definePageMeta({
   layout: 'auth'
 })
 
-const { post } = useApi()
 const { saveAuthToken, getAuthRedirect } = useAuth()
+const { signInWithEmail, signInWithGoogle } = useFirebaseAuth()
 
 const form = reactive({
   email: '',
@@ -27,33 +27,30 @@ const onSubmit = async () => {
   isLoading.value = true
 
   try {
-    const response = await post('/auth/login', {
-      email: form.email.trim().toLowerCase(),
-      password: form.password
-    })
-
-    if (!response.success || !response.token) {
-      errorMessage.value = response.message || 'Unable to sign in. Please try again.'
-      return
-    }
-
+    const response = await signInWithEmail(form.email.trim().toLowerCase(), form.password, form.remember)
     saveAuthToken(response.token)
     await navigateTo(getAuthRedirect())
-  } catch {
-    errorMessage.value = 'Unable to reach the server. Check that the backend is running and try again.'
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : 'Unable to sign in. Please try again.'
   } finally {
     isLoading.value = false
   }
 }
 
-const onGoogleClick = () => {
+const onGoogleClick = async () => {
   errorMessage.value = ''
-  infoMessage.value = 'Google sign-in is coming soon.'
-  setTimeout(() => {
-    if (infoMessage.value === 'Google sign-in is coming soon.') {
-      infoMessage.value = ''
-    }
-  }, 4000)
+  infoMessage.value = ''
+  isLoading.value = true
+
+  try {
+    const response = await signInWithGoogle(form.remember)
+    saveAuthToken(response.token)
+    await navigateTo(getAuthRedirect())
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : 'Unable to sign in with Google.'
+  } finally {
+    isLoading.value = false
+  }
 }
 </script>
 
@@ -182,6 +179,7 @@ const onGoogleClick = () => {
       <button
         type="button"
         class="signin-google"
+        :disabled="isLoading"
         @click="onGoogleClick"
       >
         <svg

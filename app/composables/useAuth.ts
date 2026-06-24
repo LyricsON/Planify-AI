@@ -27,12 +27,19 @@ export function useAuth() {
 
   async function logout() {
     const { post } = useApi()
+    const { signOutFirebase } = useFirebaseAuth()
     
     try {
       await post('/auth/logout')
     } catch (err) {
       console.error('Backend logout request failed:', err)
     } finally {
+      try {
+        await signOutFirebase()
+      } catch (err) {
+        console.error('Firebase sign-out failed:', err)
+      }
+
       // Clear localStorage tokens
       clearToken()
 

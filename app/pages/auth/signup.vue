@@ -5,8 +5,8 @@ definePageMeta({
   layout: 'auth'
 })
 
-const { post } = useApi()
 const { saveAuthToken } = useAuth()
+const { signUpWithEmail, signInWithGoogle } = useFirebaseAuth()
 
 const form = reactive({
   fullName: '',
@@ -83,14 +83,20 @@ onBeforeUnmount(() => {
   document.removeEventListener('pointerdown', closePasswordDropdown)
 })
 
-const onGoogleClick = () => {
+const onGoogleClick = async () => {
   errorMessage.value = ''
-  infoMessage.value = 'Google sign-up is coming soon.'
-  setTimeout(() => {
-    if (infoMessage.value === 'Google sign-up is coming soon.') {
-      infoMessage.value = ''
-    }
-  }, 4000)
+  infoMessage.value = ''
+  isLoading.value = true
+
+  try {
+    const response = await signInWithGoogle(true)
+    saveAuthToken(response.token)
+    await navigateTo('/dashboard')
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : 'Unable to sign up with Google.'
+  } finally {
+    isLoading.value = false
+  }
 }
 
 const onSubmit = async () => {
@@ -110,21 +116,16 @@ const onSubmit = async () => {
 
   isLoading.value = true
   try {
-    const response = await post('/auth/register', {
-      name: form.fullName.trim(),
-      email: form.email.trim().toLowerCase(),
-      password: form.password
-    })
-
-    if (!response.success || !response.token) {
-      errorMessage.value = response.message || 'Unable to create your account. Please try again.'
-      return
-    }
-
+    const response = await signUpWithEmail(
+      form.email.trim().toLowerCase(),
+      form.password,
+      form.fullName,
+      true
+    )
     saveAuthToken(response.token)
     await navigateTo('/dashboard')
-  } catch {
-    errorMessage.value = 'Unable to reach the server. Check that the backend is running and try again.'
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : 'Unable to create your account. Please try again.'
   } finally {
     isLoading.value = false
   }
@@ -336,6 +337,7 @@ const onSubmit = async () => {
       <button
         type="button"
         class="signup-google"
+        :disabled="isLoading"
         @click="onGoogleClick"
       >
         <svg
