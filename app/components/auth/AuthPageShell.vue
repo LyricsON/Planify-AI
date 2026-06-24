@@ -8,71 +8,87 @@ defineProps<{
 </script>
 
 <template>
-  <div class="grid grid-cols-1 lg:grid-cols-5 min-h-screen w-full">
-    <!-- Left Column (Visuals/Marketing) - 60% Width -->
-    <div class="lg:col-span-3 relative hidden border-r border-[#cbd5e1]/40 lg:flex bg-gradient-to-br from-[#f7f5ff] via-[#eef2ff] to-[#fafbff]">
-      <!-- Subtle decorative background shapes -->
-      <div class="absolute inset-0 overflow-hidden pointer-events-none">
-        <div class="absolute top-[20%] left-[10%] w-72 h-72 bg-purple-200/25 rounded-full filter blur-3xl" />
-        <div class="absolute bottom-[20%] right-[10%] w-96 h-96 bg-indigo-100/30 rounded-full filter blur-3xl" />
-        <div class="absolute top-1/4 right-1/4 w-2 h-2 bg-purple-400/40 rounded-full filter blur-sm animate-pulse" />
-        <div class="absolute bottom-1/3 left-1/3 w-3.5 h-3.5 bg-indigo-300/30 rounded-full filter blur-xs" />
-      </div>
-      <div class="relative z-10 w-full flex justify-center items-center">
-        <AuthBrandPanel :mode="mode" />
-      </div>
-    </div>
-
-    <!-- Right Column (Forms) - 40% Width -->
-    <div
-      class="lg:col-span-2 flex w-full justify-center px-6 py-8 sm:px-8 lg:px-10 xl:px-14 bg-[#fafbff]"
-      :class="align === 'start' ? 'items-start lg:pt-12 lg:pb-16' : 'items-center'"
-    >
-      <div
-        class="w-full animate-slide-up"
-        :class="mode === 'signin' ? 'max-w-[540px]' : 'max-w-[530px]'"
-      >
-        <!-- Card container -->
-        <div
-          class="border border-[#e5e7eb] bg-white shadow-[0_10px_35px_rgba(15,23,42,0.03)]"
-          :class="mode === 'signin' ? 'auth-card-signin' : 'rounded-[1.8rem] px-7 py-7 sm:px-10 sm:py-9'"
-        >
-          <div
-            class="text-center"
-            :class="mode === 'signin' ? 'auth-card-heading-signin' : 'mb-6 sm:mb-7'"
-          >
-            <!-- Planify AI Logo at the top of the card for signin mode -->
-            <div v-if="mode === 'signin'" class="mb-6 flex items-center justify-center gap-2">
-              <div class="w-8 h-8 rounded-lg bg-[var(--color-primary)] flex items-center justify-center text-white shadow-sm">
-                <UIcon
-                  name="i-lucide-sparkles"
-                  class="w-5 h-5"
-                />
-              </div>
-              <span class="text-xl font-bold tracking-tight text-[#0f172a]">Planify AI</span>
+  <div class="flex min-h-screen w-full flex-col">
+    <div class="grid flex-1 grid-cols-1 lg:grid-cols-2">
+      <!-- Left Column (Visuals/Marketing) -->
+      <div class="relative hidden border-r border-[#cbd5e1]/40 bg-gradient-to-br from-[#f7f5ff] via-[#eef2ff] to-[#fafbff] lg:flex">
+        <div class="relative z-10 flex h-full w-full flex-col px-8 pt-6">
+          <div class="flex items-center gap-3 pb-0">
+            <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--color-primary)] text-white shadow-sm">
+              <UIcon
+                name="i-lucide-sparkles"
+                class="h-6 w-6"
+              />
             </div>
-
-            <!-- Page Title -->
-            <h1
-              class="font-extrabold text-[#0f172a]"
-              :class="mode === 'signin' ? 'auth-title-signin' : 'mb-2 text-[1.8rem] sm:text-[2.35rem]'"
-            >
-              {{ title }}
-            </h1>
-            
-            <!-- Subtitle -->
-            <p
-              class="text-[#475569]"
-              :class="mode === 'signin' ? 'auth-subtitle-signin' : 'text-[0.92rem]'"
-            >
-              {{ subtitle }}
-            </p>
+            <span class="text-[1.75rem] font-bold tracking-tight text-[#0f172a]">
+              Planify AI
+            </span>
           </div>
 
-          <slot />
+          <div class="relative flex flex-1 items-center justify-center">
+            <!-- Subtle decorative background shapes -->
+            <div class="absolute inset-0 overflow-hidden pointer-events-none">
+              <div class="absolute top-[20%] left-[10%] w-72 h-72 bg-purple-200/25 rounded-full filter blur-3xl" />
+              <div class="absolute bottom-[20%] right-[10%] w-96 h-96 bg-indigo-100/30 rounded-full filter blur-3xl" />
+              <div class="absolute top-1/4 right-1/4 w-2 h-2 bg-purple-400/40 rounded-full filter blur-sm animate-pulse" />
+              <div class="absolute bottom-1/3 left-1/3 w-3.5 h-3.5 bg-indigo-300/30 rounded-full filter blur-xs" />
+            </div>
+            <AuthBrandPanel :mode="mode" />
+          </div>
         </div>
+      </div>
 
-        <slot name="after-card" />
+      <!-- Right Column (Forms) -->
+      <div
+        class="flex w-full justify-center bg-[#fafbff] px-8 py-8 sm:px-10 lg:px-12 xl:px-16"
+        :class="align === 'start' ? 'items-start lg:pt-12 lg:pb-16' : 'items-center'"
+      >
+        <div
+          class="w-full animate-slide-up px-8 sm:px-12 lg:px-16 xl:px-20"
+          :class="mode === 'signin' ? 'max-w-[680px]' : 'max-w-[660px]'"
+        >
+          <template v-if="mode === 'signin'">
+            <div
+              class="text-center"
+              :class="mode === 'signin' ? 'auth-card-heading-signin' : 'mb-6 sm:mb-7'"
+            >
+              <h1
+                class="font-extrabold text-[#0f172a]"
+                :class="mode === 'signin' ? 'auth-title-signin' : 'mb-2 text-[1.8rem] sm:text-[2.35rem]'"
+              >
+                {{ title }}
+              </h1>
+              <p
+                class="text-[#475569]"
+                :class="mode === 'signin' ? 'auth-subtitle-signin' : 'text-[0.92rem]'"
+              >
+                {{ subtitle }}
+              </p>
+            </div>
+
+            <slot />
+          </template>
+
+          <div
+            v-else
+            class="border border-[#e5e7eb] bg-white shadow-[0_10px_35px_rgba(15,23,42,0.03)] rounded-[1.8rem] px-7 py-7 sm:px-10 sm:py-9"
+          >
+            <div
+              class="text-center mb-6 sm:mb-7"
+            >
+              <h1 class="mb-2 text-[1.8rem] font-extrabold text-[#0f172a] sm:text-[2.35rem]">
+                {{ title }}
+              </h1>
+              <p class="text-[0.92rem] text-[#475569]">
+                {{ subtitle }}
+              </p>
+            </div>
+
+            <slot />
+          </div>
+
+          <slot name="after-card" />
+        </div>
       </div>
     </div>
   </div>
@@ -80,8 +96,8 @@ defineProps<{
 
 <style scoped>
 .auth-card-signin {
-  border-radius: 30px;
-  padding: 44px 48px;
+  border-radius: 0;
+  padding: 0;
 }
 
 .auth-card-heading-signin {
@@ -89,24 +105,19 @@ defineProps<{
 }
 
 .auth-title-signin {
-  margin-bottom: 10px;
-  font-size: 32px;
+  margin-bottom: 4px;
+  font-size: 2rem;
   letter-spacing: -0.5px;
 }
 
 .auth-subtitle-signin {
-  font-size: 15px;
-  line-height: 1.5;
+  font-size: 1rem;
+  line-height: 1.45;
 }
 
 @media (max-width: 640px) {
-  .auth-card-signin {
-    padding: 30px 24px;
-    border-radius: 24px;
-  }
-
   .auth-title-signin {
-    font-size: 26px;
+    font-size: 2.125rem;
   }
 }
 </style>
