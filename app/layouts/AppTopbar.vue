@@ -30,13 +30,13 @@ const pageHeaders: Record<string, { title: string; subtitle: string; icon?: stri
     iconClass: 'files-icon-container',
   },
   '/dashboard/tasks': {
-    title: 'Exams & Tasks',
+    title: 'Tasks',
     subtitle: 'Stay on top of your deadlines and focus on what matters.',
     icon: 'i-lucide-square-check-big',
     iconClass: 'tasks-icon-container',
   },
   '/dashboard/exams': {
-    title: 'Exams & Tasks',
+    title: 'Exams',
     subtitle: 'Stay on top of your deadlines and focus on what matters.',
     icon: 'i-lucide-circle-check',
     iconClass: 'exams-icon-container',

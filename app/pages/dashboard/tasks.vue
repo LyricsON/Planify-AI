@@ -38,6 +38,9 @@ const router = useRouter()
 const tasks = ref<Task[]>([])
 const courses = ref<Course[]>([])
 const schedules = ref<Schedule[]>([])
+const exams = ref<any[]>([])
+const studySessions = ref<any[]>([])
+const preferences = ref<any>(null)
 const isLoading = ref(true)
 const loadError = ref('')
 
@@ -102,14 +105,17 @@ async function loadData() {
     const todayEnd = new Date()
     todayEnd.setHours(23, 59, 59, 999)
 
-    const [tRes, cRes, sRes] = await Promise.all([
+    const [tRes, cRes, sRes, eRes, ssRes, prefRes] = await Promise.all([
       get<any>('/tasks', { limit: 100 }),
       get<any>('/courses', { limit: 100 }),
       get<any>('/schedules', {
         start: todayStart.toISOString(),
         end: todayEnd.toISOString(),
         limit: 100
-      })
+      }),
+      get<any>('/exams', { limit: 100 }),
+      get<any>('/study-sessions', { limit: 100 }),
+      get<any>('/preferences')
     ])
 
     // Handle 401 — token expired / invalid
@@ -128,6 +134,9 @@ async function loadData() {
     tasks.value = extractArray(tRes)
     courses.value = extractArray(cRes)
     schedules.value = extractArray(sRes)
+    exams.value = extractArray(eRes)
+    studySessions.value = extractArray(ssRes)
+    preferences.value = prefRes.success ? prefRes.data : null
   } catch (e: any) {
     loadError.value = e?.message || 'Unexpected error loading tasks.'
     console.error('[Tasks] loadData error:', e)
@@ -233,23 +242,12 @@ const stats = computed(() => {
   const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7)
   const thisWeek = tasks.value.filter(t => t.createdAt && new Date(t.createdAt) >= weekAgo).length
 
-  // Today's priorities: high priority + due today, or just high priority active
-  const today = new Date(); today.setHours(23, 59, 59, 999)
-  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
-  const todayHighPri = tasks.value.filter(t => {
-    if (t.status === 'completed' || t.priority !== 'high') return false
-    if (!t.deadline) return false
-    const d = new Date(t.deadline)
-    return d >= todayStart && d <= today
-  }).length
-
-  const totalHighPri = tasks.value.filter(t =>
-    t.status !== 'completed' && t.priority === 'high'
-  ).length
+  // Today's priorities: high-priority active tasks
+  const todayPriorities = tasks.value.filter(t => t.priority === 'high' && t.status !== 'completed').length
 
   const completionPct = total > 0 ? Math.round((completed / total) * 100) : 0
 
-  return { total, completed, overdue, thisWeek, completionPct, todayPriorities: todayHighPri || totalHighPri }
+  return { total, completed, overdue, thisWeek, completionPct, todayPriorities }
 })
 
 // ── Status counts for donut ───────────────────────────────────────────────────
@@ -313,7 +311,6 @@ function matchesSearch(t: typeof enrichedTasks.value[0]): boolean {
 }
 
 function matchesTab(t: typeof enrichedTasks.value[0]): boolean {
-  const now = new Date()
   switch (activeTab.value) {
     case 'upcoming':
       return t.status !== 'completed' && !!t.deadline && new Date(t.deadline) > now
@@ -386,47 +383,133 @@ const kanbanColumns = computed(() => [
 // ── Upcoming Deadlines ────────────────────────────────────────────────────────
 const upcomingDeadlines = computed(() =>
   enrichedTasks.value
-    .filter(t => t.deadline && t.status !== 'completed' && new Date(t.deadline) >= new Date())
+    .filter(t => t.deadline && t.status !== 'completed')
     .sort((a, b) => new Date(a.deadline!).getTime() - new Date(b.deadline!).getTime())
     .slice(0, 5)
 )
 
 // ── AI Prioritization ─────────────────────────────────────────────────────────
-const aiPriorities = computed(() =>
-  enrichedTasks.value
-    .filter(t => t.status !== 'completed')
-    .sort((a, b) => {
-      const pw = priorityWeight(b.priority) - priorityWeight(a.priority)
-      if (pw !== 0) return pw
-      return new Date(a.deadline || 0).getTime() - new Date(b.deadline || 0).getTime()
-    })
+function calculatePriorityScore(t: Task): number {
+  let score = 0
+
+  // 1. Task priority
+  if (t.priority === 'high') score += 1000
+  else if (t.priority === 'medium') score += 500
+  else score += 100
+
+  // 2. Overdue status / Proximity
+  const now = Date.now()
+  if (t.deadline) {
+    const dueTime = new Date(t.deadline).getTime()
+    if (dueTime < now) {
+      score += 2000 // Overdue bonus
+    } else {
+      const diffDays = (dueTime - now) / 86400000
+      if (diffDays <= 1) score += 800
+      else if (diffDays <= 3) score += 400
+      else if (diffDays <= 7) score += 200
+    }
+  }
+
+  return score
+}
+
+const aiPriorities = computed(() => {
+  const active = enrichedTasks.value.filter(t => t.status !== 'completed')
+  return [...active]
+    .map(t => ({
+      ...t,
+      score: calculatePriorityScore(t)
+    }))
+    .sort((a, b) => b.score - a.score)
     .slice(0, 3)
-)
+})
 
 // ── Today's Agenda ────────────────────────────────────────────────────────────
-const todayAgenda = computed(() =>
-  schedules.value
-    .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime())
-)
+const todayAgenda = computed(() => {
+  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
+  const todayEnd = new Date(); todayEnd.setHours(23, 59, 59, 999)
+
+  const list: any[] = []
+
+  // Add tasks due today
+  tasks.value.forEach(t => {
+    if (t.deadline) {
+      const d = new Date(t.deadline)
+      if (d >= todayStart && d <= todayEnd && t.status !== 'completed') {
+        list.push({
+          _id: t._id,
+          title: `Due: ${t.title}`,
+          start: t.deadline,
+          end: t.deadline,
+          type: 'task',
+          courseId: t.courseId
+        })
+      }
+    }
+  })
+
+  // Add exams today
+  exams.value.forEach(e => {
+    if (e.examDate) {
+      const d = new Date(e.examDate)
+      if (d >= todayStart && d <= todayEnd) {
+        list.push({
+          _id: e._id,
+          title: `Exam: ${e.title}`,
+          start: e.examDate,
+          end: e.examDate,
+          type: 'exam',
+          courseId: e.courseId
+        })
+      }
+    }
+  })
+
+  // Add schedules today (deduplicated by title)
+  schedules.value.forEach(s => {
+    if (s.start) {
+      const d = new Date(s.start)
+      if (d >= todayStart && d <= todayEnd) {
+        const isDuplicate = list.some(item => 
+          item.title.includes(s.title) || s.title.includes(item.title)
+        )
+        if (!isDuplicate) {
+          list.push({
+            _id: s._id,
+            title: s.title,
+            start: s.start,
+            end: s.end,
+            type: s.type || 'study_session',
+            courseId: s.courseId
+          })
+        }
+      }
+    }
+  })
+
+  return list.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime())
+})
 
 // ── Daily Habits ──────────────────────────────────────────────────────────────
 const dailyHabits = computed(() => {
   const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
   const todayEnd = new Date(); todayEnd.setHours(23, 59, 59, 999)
 
-  // Study 2+ hours: sum estimatedDuration from active/completed tasks or today's schedules
-  const taskMins = tasks.value
-    .filter(t => (t.status === 'in_progress' || t.status === 'completed') && t.estimatedDuration)
-    .reduce((acc, t) => acc + (t.estimatedDuration || 0), 0)
-  const scheduleMins = schedules.value.reduce((acc, s) => {
-    const dur = (new Date(s.end).getTime() - new Date(s.start).getTime()) / 60000
-    return acc + Math.max(0, dur)
-  }, 0)
-  const studyMins = Math.max(taskMins, scheduleMins)
-  const studyTarget = 120
-  const studyDone = studyMins >= studyTarget
+  // 1. Study Hours (sum from completed study sessions today)
+  const todayStudyMins = studySessions.value
+    .filter(ss => {
+      if (ss.status !== 'completed' || !ss.startTime) return false
+      const d = new Date(ss.startTime)
+      return d >= todayStart && d <= todayEnd
+    })
+    .reduce((acc, ss) => acc + (ss.duration || 0), 0)
 
-  // Solve tasks: completed tasks today
+  const studyHoursCurrent = Math.round((todayStudyMins / 60) * 10) / 10
+  const studyHoursTarget = 2
+  const studyDone = todayStudyMins >= 120
+
+  // 2. Tasks Completed (tasks completed today)
   const completedToday = tasks.value.filter(t => {
     if (t.status !== 'completed' || !t.updatedAt) return false
     const d = new Date(t.updatedAt)
@@ -434,7 +517,7 @@ const dailyHabits = computed(() => {
   }).length
   const taskTarget = 10
 
-  // Review flashcards: tasks with status review or title containing review
+  // 3. Flashcards Reviewed (tasks in review or matching search)
   const reviewCount = tasks.value.filter(t =>
     t.status === 'review' || t.title.toLowerCase().includes('review') || t.title.toLowerCase().includes('flashcard')
   ).length
@@ -443,13 +526,13 @@ const dailyHabits = computed(() => {
   return [
     {
       label: 'Study for 2+ hours',
-      current: Math.round(studyMins / 60 * 10) / 10,
-      target: 2,
+      current: studyHoursCurrent,
+      target: studyHoursTarget,
       unit: 'h',
-      displayCurrent: studyMins > 0 ? `${Math.floor(studyMins / 60)}h ${studyMins % 60}m` : '0h',
-      displayTarget: '2h',
+      displayCurrent: todayStudyMins > 0 ? `${Math.floor(todayStudyMins / 60)}h ${todayStudyMins % 60}m` : '0h',
+      displayTarget: `${studyHoursTarget}h`,
       done: studyDone,
-      pct: Math.min(100, Math.round((studyMins / studyTarget) * 100))
+      pct: Math.min(100, Math.round((todayStudyMins / 120) * 100))
     },
     {
       label: 'Solve tasks/problems',
@@ -476,25 +559,55 @@ const dailyHabits = computed(() => {
 
 // ── Recent Activity ───────────────────────────────────────────────────────────
 const recentActivity = computed(() => {
-  return enrichedTasks.value
-    .filter(t => t.updatedAt || t.createdAt)
-    .map(t => ({
-      _id: t._id,
-      text: t.status === 'completed'
-        ? `Completed ${t.title}`
-        : t.updatedAt
-          ? `Updated task: ${t.title}`
-          : `Added task: ${t.title}`,
-      icon: t.status === 'completed' ? 'i-lucide-check-circle-2' : t.updatedAt ? 'i-lucide-pencil' : 'i-lucide-plus-circle',
-      iconColor: t.status === 'completed' ? 'var(--color-success)' : 'var(--color-primary)',
-      time: relativeTime(t.updatedAt || t.createdAt)
-    }))
-    .sort((a, b) => {
-      const ta = tasks.value.find(t => t._id === a._id)
-      const tb = tasks.value.find(t => t._id === b._id)
-      return new Date(tb?.updatedAt || tb?.createdAt || 0).getTime() - new Date(ta?.updatedAt || ta?.createdAt || 0).getTime()
-    })
+  const eventsList: any[] = []
+
+  tasks.value.forEach(t => {
+    // 1. Task Creation event
+    if (t.createdAt) {
+      eventsList.push({
+        _id: `${t._id}-created`,
+        text: `Task created: "${t.title}"`,
+        icon: 'i-lucide-plus-circle',
+        iconColor: 'var(--color-primary)',
+        timestamp: new Date(t.createdAt).getTime()
+      })
+    }
+
+    // 2. Task Completion event (if completed)
+    if (t.status === 'completed') {
+      const time = t.updatedAt || t.createdAt
+      if (time) {
+        eventsList.push({
+          _id: `${t._id}-completed`,
+          text: `Task completed: "${t.title}"`,
+          icon: 'i-lucide-check-circle-2',
+          iconColor: 'var(--color-success)',
+          timestamp: new Date(time).getTime()
+        })
+      }
+    } else if (t.updatedAt && t.createdAt && new Date(t.updatedAt).getTime() > new Date(t.createdAt).getTime() + 1000) {
+      // 3. Task Update event (if modified after creation)
+      eventsList.push({
+        _id: `${t._id}-updated`,
+        text: `Task updated: "${t.title}"`,
+        icon: 'i-lucide-pencil',
+        iconColor: 'var(--color-warning)',
+        timestamp: new Date(t.updatedAt).getTime()
+      })
+    }
+  })
+
+  // Sort by timestamp descending (newest first)
+  return eventsList
+    .sort((a, b) => b.timestamp - a.timestamp)
     .slice(0, 5)
+    .map(evt => ({
+      _id: evt._id,
+      text: evt.text,
+      icon: evt.icon,
+      iconColor: evt.iconColor,
+      time: relativeTime(new Date(evt.timestamp).toISOString())
+    }))
 })
 
 // ── Modal logic ───────────────────────────────────────────────────────────────
@@ -580,12 +693,23 @@ function confirmDelete(id: string) {
 async function executeDelete() {
   if (!deleteTargetId.value) return
   isSubmitting.value = true
+  const targetId = deleteTargetId.value
+  const originalTasks = [...tasks.value]
+  
+  // Optimistic update
+  tasks.value = tasks.value.filter(t => t._id !== targetId)
+  showDeleteConfirm.value = false
+  
   try {
-    await del(`/tasks/${deleteTargetId.value}`)
-    showDeleteConfirm.value = false
-    deleteTargetId.value = ''
-    await loadData()
+    const res = await del(`/tasks/${targetId}`)
+    if (!res.success) {
+      tasks.value = originalTasks
+    } else {
+      deleteTargetId.value = ''
+      await loadData()
+    }
   } catch (e) {
+    tasks.value = originalTasks
     console.error('Delete error', e)
   } finally {
     isSubmitting.value = false
@@ -598,11 +722,25 @@ function toggleMenu(id: string) {
   openMenuId.value = openMenuId.value === id ? null : id
 }
 
-// Quick status change
+// Quick status change with optimistic updates
 async function quickStatus(task: Task, status: Task['status']) {
   openMenuId.value = null
-  const res = await put<any>(`/tasks/${task._id}`, { status })
-  if (res.success) await loadData()
+  const oldStatus = task.status
+  
+  // Optimistic update
+  task.status = status
+  
+  try {
+    const res = await put<any>(`/tasks/${task._id}`, { status })
+    if (!res.success) {
+      task.status = oldStatus
+    } else {
+      await loadData()
+    }
+  } catch (e) {
+    task.status = oldStatus
+    console.error('Failed to update status:', e)
+  }
 }
 </script>
 
@@ -825,20 +963,36 @@ async function quickStatus(task: Task, status: Task['status']) {
                         <button class="task-dropdown-item" @click="openEditModal(task); openMenuId = null">
                           <UIcon name="i-lucide-pencil" class="size-3.5" />Edit
                         </button>
+                        
                         <button
-                          v-if="task.status !== 'completed'"
+                          v-if="task.status === 'todo'"
+                          class="task-dropdown-item"
+                          @click="quickStatus(task, 'in_progress')"
+                        >
+                          <UIcon name="i-lucide-play" class="size-3.5" />Start Task
+                        </button>
+                        <button
+                          v-if="task.status === 'in_progress'"
+                          class="task-dropdown-item"
+                          @click="quickStatus(task, 'review')"
+                        >
+                          <UIcon name="i-lucide-eye" class="size-3.5" />Move to Review
+                        </button>
+                        <button
+                          v-if="task.status === 'review'"
                           class="task-dropdown-item"
                           @click="quickStatus(task, 'completed')"
                         >
-                          <UIcon name="i-lucide-check" class="size-3.5" />Mark Complete
+                          <UIcon name="i-lucide-check" class="size-3.5" />Complete Task
                         </button>
                         <button
                           v-if="task.status === 'completed'"
                           class="task-dropdown-item"
                           @click="quickStatus(task, 'todo')"
                         >
-                          <UIcon name="i-lucide-rotate-ccw" class="size-3.5" />Reopen
+                          <UIcon name="i-lucide-rotate-ccw" class="size-3.5" />Reopen Task
                         </button>
+                        
                         <button class="task-dropdown-item task-dropdown-item--danger" @click="confirmDelete(task._id); openMenuId = null">
                           <UIcon name="i-lucide-trash-2" class="size-3.5" />Delete
                         </button>
@@ -1038,7 +1192,7 @@ async function quickStatus(task: Task, status: Task['status']) {
                     </span>
                   </div>
                 </div>
-                <button class="btn-start" @click="openEditModal(task as Task)">Start</button>
+                <button class="btn-start" @click="quickStatus(task as Task, 'in_progress')">Start</button>
               </div>
             </div>
 

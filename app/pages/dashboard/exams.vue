@@ -2,7 +2,7 @@
 import BoardColumn from '~/components/tasks/BoardColumn.vue'
 definePageMeta({ layout: 'dashboard' })
 
-const { get } = useApi()
+const { get, put } = useApi()
 const route = useRoute()
 const router = useRouter()
 
@@ -78,7 +78,7 @@ const filteredTasks = computed(() => {
   return base.sort((a, b) => new Date(a.deadline || 0).getTime() - new Date(b.deadline || 0).getTime())
 })
 const boardColumns = computed(() => ({
-  high: allTasks.value.filter(t => t.status !== 'completed' && t.priority === 'high'),
+  high: allTasks.value.filter(t => t.priority === 'high' && t.status !== 'completed' && t.status !== 'in_progress'),
   progress: allTasks.value.filter(t => t.status === 'in_progress'),
   completed: allTasks.value.filter(t => t.status === 'completed')
 }))
@@ -182,6 +182,26 @@ function toneBadge(priority: string) {
 function formatShortDate(v?: string) {
   if (!v) return '-'
   return new Date(v).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+}
+
+async function handleBoardAction({ task, action }: { task: any; action: 'start' | 'complete' | 'reopen' }) {
+  let newStatus = 'todo'
+  if (action === 'start') {
+    newStatus = 'in_progress'
+  } else if (action === 'complete') {
+    newStatus = 'completed'
+  } else if (action === 'reopen') {
+    newStatus = 'todo'
+  }
+
+  try {
+    const res = await put<any>(`/tasks/${task._id}`, { status: newStatus })
+    if (res.success) {
+      await load()
+    }
+  } catch (e) {
+    console.error('[Exams] Failed to update task status:', e)
+  }
 }
 
 async function load() {
@@ -289,9 +309,9 @@ watch(() => route.query.tab, syncTabFromQuery)
           </div>
         </div>
         <div class="grid grid-cols-1 xl:grid-cols-3 gap-3">
-          <BoardColumn title="High Priority" tone="high" :items="boardColumns.high"><template #meta="{ task }"><div class="mt-1 flex items-center justify-between"><span class="text-[11px] px-2 py-0.5 rounded bg-sky-100 text-sky-700">{{ shortCourse(task.courseTitle) }}</span><span class="text-[12px] text-red-500">{{ daysUntilTask(task.deadline) }}</span></div></template></BoardColumn>
-          <BoardColumn title="In Progress" tone="progress" :items="boardColumns.progress"><template #meta="{ task }"><div class="mt-1 flex items-center justify-between"><span class="text-[11px] px-2 py-0.5 rounded bg-sky-100 text-sky-700">{{ shortCourse(task.courseTitle) }}</span><span class="text-[12px] text-amber-500">{{ daysUntilTask(task.deadline) }}</span></div></template></BoardColumn>
-          <BoardColumn title="Completed" tone="completed" :items="boardColumns.completed"><template #meta="{ task }"><div class="mt-1 flex items-center justify-between"><span class="text-[11px] px-2 py-0.5 rounded bg-sky-100 text-sky-700">{{ shortCourse(task.courseTitle) }}</span><span class="text-[12px]" style="color:var(--color-text-soft)">{{ formatShortDate(task.deadline) }}</span></div></template></BoardColumn>
+          <BoardColumn title="High Priority" tone="high" :items="boardColumns.high" @action="handleBoardAction"><template #meta="{ task }"><div class="mt-1 flex items-center justify-between"><span class="text-[11px] px-2 py-0.5 rounded bg-sky-100 text-sky-700">{{ shortCourse(task.courseTitle) }}</span><span class="text-[12px] text-red-500">{{ daysUntilTask(task.deadline) }}</span></div></template></BoardColumn>
+          <BoardColumn title="In Progress" tone="progress" :items="boardColumns.progress" @action="handleBoardAction"><template #meta="{ task }"><div class="mt-1 flex items-center justify-between"><span class="text-[11px] px-2 py-0.5 rounded bg-sky-100 text-sky-700">{{ shortCourse(task.courseTitle) }}</span><span class="text-[12px] text-amber-500">{{ daysUntilTask(task.deadline) }}</span></div></template></BoardColumn>
+          <BoardColumn title="Completed" tone="completed" :items="boardColumns.completed" @action="handleBoardAction"><template #meta="{ task }"><div class="mt-1 flex items-center justify-between"><span class="text-[11px] px-2 py-0.5 rounded bg-sky-100 text-sky-700">{{ shortCourse(task.courseTitle) }}</span><span class="text-[12px]" style="color:var(--color-text-soft)">{{ formatShortDate(task.deadline) }}</span></div></template></BoardColumn>
         </div>
       </div>
 

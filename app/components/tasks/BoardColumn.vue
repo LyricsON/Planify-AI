@@ -6,7 +6,7 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  (e: 'toggle', item: any): void
+  (e: 'action', payload: { task: any; action: 'start' | 'complete' | 'reopen' }): void
 }>()
 
 function toneWrap() {
@@ -50,7 +50,20 @@ function tonePill() {
             </div>
             <p class="min-w-0 mb-0" :class="tone === 'completed' ? 'text-[12px] line-through text-[var(--color-text-muted)]' : 'text-[12px] font-medium'" style="color:var(--color-text);margin-bottom:0">{{ t.title }}</p>
           </div>
-          <button v-if="tone === 'high'" class="text-[12px] text-red-500 font-semibold" @click="emit('toggle', t)">{{ t.status === 'completed' ? 'Undo' : 'Done' }}</button>
+          
+          <div class="flex items-center gap-1.5 shrink-0 whitespace-nowrap">
+            <template v-if="tone === 'high'">
+              <button class="text-[11px] text-indigo-600 dark:text-indigo-400 font-bold hover:underline" @click="emit('action', { task: t, action: 'start' })">Start</button>
+              <span class="text-slate-300 dark:text-slate-700 text-[10px] select-none">|</span>
+              <button class="text-[11px] text-red-500 font-bold hover:underline" @click="emit('action', { task: t, action: 'complete' })">Done</button>
+            </template>
+            <template v-else-if="tone === 'progress'">
+              <button class="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold hover:underline" @click="emit('action', { task: t, action: 'complete' })">Done</button>
+            </template>
+            <template v-else-if="tone === 'completed'">
+              <button class="text-[11px] text-slate-500 dark:text-slate-400 font-bold hover:underline" @click="emit('action', { task: t, action: 'reopen' })">Reopen</button>
+            </template>
+          </div>
         </div>
         <div :class="tone === 'completed' ? 'mt-1 pl-6 [&_*]:mb-0' : ''">
           <slot name="meta" :task="t" />
