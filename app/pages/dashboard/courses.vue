@@ -81,9 +81,8 @@ const activeTab = ref<'overview' | 'files' | 'summaries' | 'exercises'>('overvie
 const aiTab = ref<'overview' | 'topics'>('overview')
 
 // ─── Upload State ─────────────────────────────────────────────────────────────
-const uploadRef = ref<HTMLInputElement | null>(null)
-const isDragging = ref(false)
 const uploadState = ref<UploadState>({ active: false, error: null, fileName: '' })
+const dropzoneRef = ref<any>(null)
 
 // ─── AI Summary ───────────────────────────────────────────────────────────────
 const aiSummary = ref<AiSummary>({ title: '', summary: '', keyPoints: [], isLoading: false, error: null })
@@ -384,6 +383,7 @@ async function deleteCourse() {
 async function handleUpload(fileList: FileList | null) {
   if (!fileList || fileList.length === 0) return
   const file = fileList[0]
+  if (!file) return
   uploadState.value = { active: true, error: null, fileName: file.name }
   const fd = new FormData()
   fd.append('file', file)
@@ -395,27 +395,9 @@ async function handleUpload(fileList: FileList | null) {
   } else {
     uploadState.value = { active: false, error: res.message || 'Upload failed', fileName: '' }
   }
-  if (uploadRef.value) uploadRef.value.value = ''
 }
 
-function onFileInputChange(e: Event) {
-  handleUpload((e.target as HTMLInputElement).files)
-}
 
-function onDragOver(e: DragEvent) {
-  e.preventDefault()
-  isDragging.value = true
-}
-
-function onDragLeave() {
-  isDragging.value = false
-}
-
-function onDrop(e: DragEvent) {
-  e.preventDefault()
-  isDragging.value = false
-  handleUpload(e.dataTransfer?.files || null)
-}
 
 async function deleteFile(fileId: string) {
   const res = await del(`/files/${fileId}`)
@@ -766,32 +748,12 @@ onUnmounted(() => {
 
         <!-- ── Upload Box ─────────────────────────────────────────────────────── -->
         <div>
-          <div
-            class="upload-box w-full"
-            :class="{ 'upload-box--dragging': isDragging, 'upload-box--uploading': uploadState.active }"
-            @click="!uploadState.active && uploadRef?.click()"
-            @dragover="onDragOver"
-            @dragleave="onDragLeave"
-            @drop="onDrop"
-          >
-            <!-- Uploading state -->
-            <template v-if="uploadState.active">
-              <div class="mx-auto mb-4 flex size-[58px] items-center justify-center rounded-full border border-[var(--color-primary)]/30 bg-[var(--color-surface)] text-[var(--color-primary)]">
-                <UIcon name="i-lucide-loader-2" class="size-5 animate-spin" />
-              </div>
-              <p class="text-lg font-semibold text-[var(--color-text)]">Uploading…</p>
-              <p class="mt-2 text-sm text-[var(--color-text-muted)] truncate max-w-xs mx-auto">{{ uploadState.fileName }}</p>
-            </template>
-            <!-- Default state -->
-            <template v-else>
-              <div class="mx-auto mb-4 flex size-[58px] items-center justify-center rounded-full border border-[var(--color-primary)]/30 bg-[var(--color-surface)] text-[var(--color-primary)]">
-                <UIcon name="i-lucide-upload" class="size-5" />
-              </div>
-              <p class="text-lg font-semibold text-[var(--color-text)]">Upload files <span class="font-normal text-[var(--color-text-muted)]">or drag &amp; drop</span></p>
-              <p class="mt-2 text-sm text-[var(--color-text-muted)]">PDF, DOCX, PPTX, XLSX, Images up to 50MB</p>
-              <span class="mt-5 inline-flex rounded-[10px] border border-[var(--color-primary)]/40 px-5 py-2 text-sm font-medium text-[var(--color-primary)]">Choose Files</span>
-            </template>
-          </div>
+          <FileDropzone
+            ref="dropzoneRef"
+            :active="uploadState.active"
+            :file-name="uploadState.fileName"
+            @select="handleUpload"
+          />
 
           <!-- Upload error -->
           <div v-if="uploadState.error" class="mt-2 flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600">
@@ -802,8 +764,6 @@ onUnmounted(() => {
             </button>
           </div>
         </div>
-
-        <input ref="uploadRef" type="file" class="hidden" accept=".pdf,.docx,.pptx,.xlsx,.png,.jpg,.jpeg" @change="onFileInputChange">
 
         <!-- ── Selected Course Detail ──────────────────────────────────────────── -->
         <div v-if="selected" class="detail-card">
@@ -838,7 +798,7 @@ onUnmounted(() => {
               </div>
             </div>
             <div class="flex items-center gap-2">
-              <button class="btn-primary" @click="uploadRef?.click()">
+              <button class="btn-primary" @click="dropzoneRef?.triggerClick()">
                 <UIcon name="i-lucide-plus" class="size-4" /> Add Files
               </button>
               <div class="relative course-actions-dropdown-wrap">
@@ -1034,7 +994,7 @@ onUnmounted(() => {
                   <span v-if="activeTypeFilter !== 'all' || fileSearch">No files match your filters.</span>
                   <span v-else>No files in this course yet. Upload a file to get started.</span>
                 </p>
-                <button class="btn-primary" @click="uploadRef?.click()">
+                <button class="btn-primary" @click="dropzoneRef?.triggerClick()">
                   <UIcon name="i-lucide-upload" class="size-4" /> Upload File
                 </button>
               </div>
@@ -1652,28 +1612,7 @@ onUnmounted(() => {
 .sort-opt:hover { background: var(--color-bg); color: var(--color-text); }
 .sort-opt--active { color: var(--color-primary); font-weight: 600; }
 
-/* ─── Upload Box ───────────────────────────────────────────────────────────── */
-.upload-box {
-  border: 2px dashed color-mix(in srgb, var(--color-primary) 20%, var(--color-border));
-  border-radius: 16px;
-  padding: 34px 20px;
-  text-align: center;
-  background: color-mix(in srgb, var(--color-surface) 70%, var(--color-bg));
-  cursor: pointer;
-  transition: all .2s ease;
-}
 
-.upload-box:hover {
-  border-color: color-mix(in srgb, var(--color-primary) 60%, var(--color-border));
-  background: color-mix(in srgb, var(--color-primary) 3%, var(--color-bg));
-}
-
-.upload-box--dragging {
-  border-color: var(--color-primary);
-  background: color-mix(in srgb, var(--color-primary) 6%, var(--color-bg));
-}
-
-.upload-box--uploading { cursor: not-allowed; }
 
 /* ─── Detail Card ──────────────────────────────────────────────────────────── */
 .detail-card {
