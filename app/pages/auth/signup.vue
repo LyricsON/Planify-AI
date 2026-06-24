@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 
 definePageMeta({
   layout: 'auth'
@@ -12,30 +12,94 @@ const form = reactive({
   fullName: '',
   email: '',
   password: '',
-  confirmPassword: '',
   role: 'Student',
   terms: false
 })
 
 const showPassword = ref(false)
-const showConfirmPassword = ref(false)
 const isLoading = ref(false)
 const errorMessage = ref('')
+const infoMessage = ref('')
+const passwordFocused = ref(false)
+const passwordInteracted = ref(false)
+const passwordWrapRef = ref<HTMLElement | null>(null)
 
 const roleOptions = ['Student', 'Worker', 'Freelancer', 'Entrepreneur']
 
-const onSubmit = async () => {
-  if (!form.fullName || !form.email || !form.password || !form.confirmPassword || isLoading.value) return
+const passwordStrength = computed(() => {
+  const value = form.password
+  let score = 0
 
-  errorMessage.value = ''
+  if (value.length >= 10) score += 1
+  if (/[a-z]/.test(value)) score += 1
+  if (/[A-Z]/.test(value)) score += 1
+  if (/\d/.test(value)) score += 1
+  if (/[^A-Za-z0-9]/.test(value)) score += 1
 
-  if (form.password !== form.confirmPassword) {
-    errorMessage.value = 'Passwords don\'t match.'
+  if (!value) {
+    return { label: '', width: '0%', tone: 'neutral' as const }
+  }
+
+  if (score <= 2) return { label: 'Weak', width: '35%', tone: 'danger' as const }
+  if (score === 3) return { label: 'Medium', width: '68%', tone: 'warning' as const }
+  return { label: 'Strong', width: '100%', tone: 'success' as const }
+})
+
+const passwordChecks = computed(() => [
+  { label: 'At least 10 characters', ok: form.password.length >= 10 },
+  { label: 'One lowercase letter', ok: /[a-z]/.test(form.password) },
+  { label: 'One uppercase letter', ok: /[A-Z]/.test(form.password) },
+  { label: 'One number', ok: /\d/.test(form.password) }
+])
+
+const showPasswordDropdown = computed(() => {
+  return passwordInteracted.value && passwordFocused.value && form.password.length > 0
+})
+
+const closePasswordDropdown = (event: MouseEvent | PointerEvent) => {
+  const target = event.target
+
+  if (!(target instanceof Node)) return
+  if (passwordWrapRef.value?.contains(target)) return
+
+  passwordFocused.value = false
+}
+
+const handlePasswordFocusOut = (event: FocusEvent) => {
+  const nextTarget = event.relatedTarget
+
+  if (nextTarget instanceof Node && passwordWrapRef.value?.contains(nextTarget)) {
     return
   }
 
-  if (form.password.length < 8) {
-    errorMessage.value = 'Password must be at least 8 characters.'
+  passwordFocused.value = false
+}
+
+onMounted(() => {
+  document.addEventListener('pointerdown', closePasswordDropdown)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('pointerdown', closePasswordDropdown)
+})
+
+const onGoogleClick = () => {
+  errorMessage.value = ''
+  infoMessage.value = 'Google sign-up is coming soon.'
+  setTimeout(() => {
+    if (infoMessage.value === 'Google sign-up is coming soon.') {
+      infoMessage.value = ''
+    }
+  }, 4000)
+}
+
+const onSubmit = async () => {
+  if (!form.fullName || !form.email || !form.password || isLoading.value) return
+
+  errorMessage.value = ''
+
+  if (form.password.length < 10) {
+    errorMessage.value = 'Password must be at least 10 characters.'
     return
   }
 
@@ -75,119 +139,147 @@ const onSubmit = async () => {
     align="start"
   >
     <form
-      class="space-y-4"
+      class="signup-form"
       @submit.prevent="onSubmit"
     >
       <div
         v-if="errorMessage"
-        class="flex items-start gap-3 rounded-[1rem] border border-[color-mix(in_srgb,var(--color-danger)_24%,transparent)] bg-[color-mix(in_srgb,var(--color-danger)_10%,var(--color-card-bg))] px-4 py-3 text-[14px] leading-6 text-[color-mix(in_srgb,var(--color-danger)_78%,var(--color-text))]"
+        class="signup-alert signup-alert-error"
       >
         <UIcon
           name="i-lucide-circle-alert"
-          class="mt-1 h-4 w-4 shrink-0"
+          class="signup-alert-icon"
         />
         <span>{{ errorMessage }}</span>
       </div>
 
+      <div
+        v-if="infoMessage"
+        class="signup-alert signup-alert-info animate-fade-in"
+      >
+        <UIcon
+          name="i-lucide-info"
+          class="signup-alert-icon"
+        />
+        <span>{{ infoMessage }}</span>
+      </div>
+
       <label class="block space-y-2.5">
-        <span class="text-[13px] font-semibold text-[var(--color-text)]">Full name</span>
-        <div class="flex h-12 items-center gap-3 rounded-[1rem] border border-[var(--color-border)] bg-[var(--color-input-bg)] px-4">
+        <span class="signup-label">Full name</span>
+        <div class="signup-input">
           <UIcon
             name="i-lucide-user"
-            class="h-5 w-5 text-[var(--color-text-muted)]"
+            class="signup-input-icon"
           />
           <input
             v-model="form.fullName"
             type="text"
             required
             placeholder="Enter your full name"
-            class="h-full w-full border-0 bg-transparent text-[15px] text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)]"
+            class="signup-input-control"
           >
         </div>
       </label>
 
       <label class="block space-y-2.5">
-        <span class="text-[13px] font-semibold text-[var(--color-text)]">Email address</span>
-        <div class="flex h-12 items-center gap-3 rounded-[1rem] border border-[var(--color-border)] bg-[var(--color-input-bg)] px-4">
+        <span class="signup-label">Email address</span>
+        <div class="signup-input">
           <UIcon
             name="i-lucide-mail"
-            class="h-5 w-5 text-[var(--color-text-muted)]"
+            class="signup-input-icon"
           />
           <input
             v-model="form.email"
             type="email"
             required
             placeholder="Enter your email"
-            class="h-full w-full border-0 bg-transparent text-[15px] text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)]"
+            class="signup-input-control"
           >
         </div>
       </label>
 
       <label class="block space-y-2.5">
-        <span class="text-[13px] font-semibold text-[var(--color-text)]">Password</span>
-        <div class="flex h-12 items-center gap-3 rounded-[1rem] border border-[var(--color-border)] bg-[var(--color-input-bg)] px-4">
-          <UIcon
-            name="i-lucide-lock"
-            class="h-5 w-5 text-[var(--color-text-muted)]"
-          />
-          <input
-            v-model="form.password"
-            :type="showPassword ? 'text' : 'password'"
-            required
-            placeholder="Create a password"
-            class="h-full w-full border-0 bg-transparent text-[15px] text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)]"
-          >
-          <button
-            type="button"
-            class="text-[var(--color-text-muted)] transition-colors hover:text-[var(--color-text)]"
-            @click="showPassword = !showPassword"
-          >
+        <span class="signup-label">Password</span>
+        <div
+          ref="passwordWrapRef"
+          class="signup-password-wrap"
+          @pointerdown="passwordInteracted = true"
+          @focusin="passwordFocused = true"
+          @focusout="handlePasswordFocusOut"
+        >
+          <div class="signup-input">
             <UIcon
-              :name="showPassword ? 'i-lucide-eye-off' : 'i-lucide-eye'"
-              class="h-5 w-5"
+              name="i-lucide-lock"
+              class="signup-input-icon"
             />
-          </button>
+            <input
+              v-model="form.password"
+              :type="showPassword ? 'text' : 'password'"
+              required
+              placeholder="Create a password"
+              class="signup-input-control"
+            >
+            <button
+              type="button"
+              class="signup-icon-button"
+              @mousedown.prevent
+              @click="showPassword = !showPassword"
+            >
+              <UIcon
+                :name="showPassword ? 'i-lucide-eye-off' : 'i-lucide-eye'"
+                class="signup-input-icon"
+              />
+            </button>
+          </div>
+
+          <Transition name="password-dropdown">
+            <div
+              v-if="showPasswordDropdown"
+              class="signup-password-card"
+            >
+              <div class="signup-password-head">
+                <span>Choose a password</span>
+                <span
+                  class="signup-password-label"
+                  :class="`is-${passwordStrength.tone}`"
+                >
+                  {{ passwordStrength.label || 'Typing...' }}
+                </span>
+              </div>
+              <div class="signup-password-bar">
+                <div
+                  class="signup-password-bar-fill"
+                  :class="`is-${passwordStrength.tone}`"
+                  :style="{ width: passwordStrength.width }"
+                />
+              </div>
+              <p class="signup-password-subtitle">
+                Suggestions
+              </p>
+              <ul class="signup-password-list">
+                <li
+                  v-for="check in passwordChecks"
+                  :key="check.label"
+                  :class="check.ok ? 'is-ok' : ''"
+                >
+                  {{ check.label }}
+                </li>
+              </ul>
+            </div>
+          </Transition>
         </div>
-        <p class="text-[12px] leading-[1.45] text-[var(--color-text-muted)]">Use at least 8 characters with a mix of letters, numbers &amp; symbols.</p>
       </label>
 
       <label class="block space-y-2.5">
-        <span class="text-[13px] font-semibold text-[var(--color-text)]">Confirm password</span>
-        <div class="flex h-12 items-center gap-3 rounded-[1rem] border border-[var(--color-border)] bg-[var(--color-input-bg)] px-4">
-          <UIcon
-            name="i-lucide-lock"
-            class="h-5 w-5 text-[var(--color-text-muted)]"
-          />
-          <input
-            v-model="form.confirmPassword"
-            :type="showConfirmPassword ? 'text' : 'password'"
-            required
-            placeholder="Confirm your password"
-            class="h-full w-full border-0 bg-transparent text-[15px] text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)]"
-          >
-          <button
-            type="button"
-            class="text-[var(--color-text-muted)] transition-colors hover:text-[var(--color-text)]"
-            @click="showConfirmPassword = !showConfirmPassword"
-          >
-            <UIcon
-              :name="showConfirmPassword ? 'i-lucide-eye-off' : 'i-lucide-eye'"
-              class="h-5 w-5"
-            />
-          </button>
-        </div>
-      </label>
-
-      <label class="block space-y-2.5">
-        <span class="text-[13px] font-semibold text-[var(--color-text)]">I'm a...</span>
-        <div class="flex h-12 items-center gap-3 rounded-[1rem] border border-[var(--color-border)] bg-[var(--color-input-bg)] px-4">
+        <span class="signup-label">I'm a...</span>
+        <div class="signup-input">
           <UIcon
             name="i-lucide-graduation-cap"
-            class="h-5 w-5 text-[var(--color-text-muted)]"
+            class="signup-input-icon"
           />
           <select
             v-model="form.role"
-            class="h-full w-full appearance-none border-0 bg-transparent text-[15px] text-[var(--color-text)] outline-none"
+            class="signup-select"
           >
             <option
               v-for="option in roleOptions"
@@ -202,12 +294,12 @@ const onSubmit = async () => {
         </div>
       </label>
 
-      <label class="flex items-start gap-3 pt-1 text-[14px] leading-6 text-[var(--color-text)]">
+      <label class="signup-terms">
         <input
           v-model="form.terms"
           type="checkbox"
           required
-          class="mt-1 h-5 w-5 rounded-[6px] border border-[var(--color-border-strong)] accent-[var(--color-primary)]"
+          class="signup-checkbox"
         >
         <span>
           I agree to the
@@ -225,35 +317,53 @@ const onSubmit = async () => {
 
       <button
         type="submit"
-        class="flex h-12 w-full items-center justify-center gap-3 rounded-[1rem] bg-[linear-gradient(90deg,#5c61f4_0%,#6b4df6_100%)] px-6 text-[0.96rem] font-semibold text-white shadow-[0_18px_40px_rgba(92,97,244,0.25)] transition-transform duration-200 hover:-translate-y-0.5 disabled:opacity-70"
+        class="signup-submit"
         :disabled="isLoading"
       >
         <UIcon
           name="i-lucide-sparkles"
-          class="h-5 w-5"
+          class="signup-submit-icon"
         />
         <span>{{ isLoading ? 'Creating account...' : 'Create account' }}</span>
       </button>
 
-      <div class="relative my-0.5 flex items-center">
-        <div class="flex-grow border-t border-[var(--color-border)]" />
-        <span class="mx-5 flex-shrink-0 text-sm text-[var(--color-text-muted)]">or</span>
-        <div class="flex-grow border-t border-[var(--color-border)]" />
+      <div class="signup-divider">
+        <div />
+        <span>or</span>
+        <div />
       </div>
 
       <button
         type="button"
-        disabled
-        class="flex h-12 w-full items-center justify-center gap-3 rounded-[1rem] border border-[var(--color-border)] bg-[var(--color-input-bg)] px-6 text-[14px] font-semibold text-[var(--color-text)] opacity-70 transition-colors hover:bg-[var(--color-bg-soft)] disabled:cursor-not-allowed"
+        class="signup-google"
+        @click="onGoogleClick"
       >
-        <UIcon
-          name="i-simple-icons-google"
-          class="h-5 w-5"
-        />
-        <span>Google sign-up coming soon</span>
+        <svg
+          class="signup-google-icon"
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+        >
+          <path
+            fill="#4285F4"
+            d="M21.805 12.226c0-.783-.07-1.536-.198-2.266H12v4.293h5.507a4.714 4.714 0 0 1-2.047 3.094v2.569h3.31c1.934-1.782 3.035-4.41 3.035-7.69z"
+          />
+          <path
+            fill="#34A853"
+            d="M12 22c2.77 0 5.094-.918 6.792-2.486l-3.31-2.569c-.918.616-2.093.983-3.482.983-2.67 0-4.935-1.802-5.742-4.226H2.825v2.654A10 10 0 0 0 12 22z"
+          />
+          <path
+            fill="#FBBC05"
+            d="M6.258 13.702A5.99 5.99 0 0 1 6.1 12c0-.592.102-1.165.286-1.702V7.644H2.825A10 10 0 0 0 2 12c0 1.594.38 3.1 1.044 4.456l3.214-2.754z"
+          />
+          <path
+            fill="#EA4335"
+            d="M12 5.982c1.508 0 2.86.518 3.927 1.536l2.944-2.944C17.09 2.905 14.767 2 12 2a9.97 9.97 0 0 0-9.175 5.644l3.433 2.656C7.065 7.784 9.33 5.982 12 5.982z"
+          />
+        </svg>
+        <span>Continue with Google</span>
       </button>
 
-      <p class="pt-0.5 text-center text-[14px] text-[var(--color-text-muted)]">
+      <p class="pt-0.5 text-center text-[12px] text-[var(--color-text-muted)]">
         Already have an account?
         <NuxtLink
           to="/auth/signin"
@@ -263,34 +373,314 @@ const onSubmit = async () => {
         </NuxtLink>
       </p>
     </form>
-
-    <template #after-card>
-      <div class="mt-4 rounded-[1.65rem] border border-[color-mix(in_srgb,var(--color-ai)_18%,transparent)] bg-[color-mix(in_srgb,var(--color-card-bg)_80%,transparent)] px-5 py-4 shadow-[0_16px_50px_rgba(120,92,255,0.08)] backdrop-blur-sm">
-        <div class="relative flex items-center gap-4">
-          <div class="flex h-12 w-12 items-center justify-center rounded-full border border-[rgba(120,92,255,0.18)] bg-[rgba(120,92,255,0.08)] text-[var(--color-ai)]">
-            <UIcon
-              name="i-lucide-gift"
-              class="h-6 w-6"
-            />
-          </div>
-          <div class="min-w-0 flex-1">
-            <h4 class="text-[0.97rem] font-bold text-[var(--color-text)]">
-              Start free for 1 month
-            </h4>
-            <p class="mt-1 text-[0.86rem] leading-[1.45] text-[var(--color-text-soft)]">
-              Get full access to all AI features and 10,000 starter tokens.
-            </p>
-          </div>
-          <UIcon
-            name="i-lucide-sparkles"
-            class="absolute right-1 top-1 h-5 w-5 text-[var(--color-ai)]/30"
-          />
-          <UIcon
-            name="i-lucide-sparkles"
-            class="absolute bottom-0 right-10 h-4 w-4 text-[var(--color-ai)]/20"
-          />
-        </div>
-      </div>
-    </template>
   </AuthPageShell>
 </template>
+
+<style scoped>
+.signup-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.signup-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  font-size: 14.5px;
+  line-height: 1.5;
+}
+
+.signup-alert-error {
+  border: 1px solid color-mix(in srgb, var(--color-danger) 20%, transparent);
+  background: color-mix(in srgb, var(--color-danger) 8%, var(--color-card-bg));
+  color: color-mix(in srgb, var(--color-danger) 85%, var(--color-text));
+}
+
+.signup-alert-info {
+  border: 1px solid color-mix(in srgb, var(--color-primary) 20%, transparent);
+  background: color-mix(in srgb, var(--color-primary) 8%, var(--color-card-bg));
+  color: var(--color-primary);
+}
+
+.signup-alert-icon {
+  width: 18px;
+  height: 18px;
+  margin-top: 2.5px;
+  flex-shrink: 0;
+}
+
+.signup-label {
+  display: block;
+  margin-bottom: 8px;
+  color: #475569;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.signup-input {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 40px;
+  padding: 0 18px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.01);
+  transition: border-color var(--transition-fast) var(--ease-out), box-shadow var(--transition-fast) var(--ease-out);
+}
+
+.signup-input:focus-within {
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1), inset 0 1px 2px rgba(15, 23, 42, 0.01);
+}
+
+.signup-input-icon {
+  width: 20px;
+  height: 20px;
+  color: #94a3b8;
+  flex-shrink: 0;
+}
+
+.signup-input-control,
+.signup-select {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #0f172a;
+  font-size: 14px;
+}
+
+.signup-input-control::placeholder {
+  color: #94a3b8;
+  opacity: 0.85;
+}
+
+.signup-icon-button {
+  display: inline-flex;
+  padding: 4px;
+  color: #94a3b8;
+  transition: color var(--transition-fast) var(--ease-out);
+}
+
+.signup-icon-button:hover {
+  color: #475569;
+}
+
+.signup-password-card {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 30;
+  border: 1px solid #e2e8f0;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+  border-radius: 0 0 14px 14px;
+  background: #ffffff;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+  padding: 14px 16px 16px;
+}
+
+.signup-password-wrap {
+  position: relative;
+  overflow: visible;
+}
+
+.signup-password-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.signup-password-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.signup-password-label.is-danger {
+  color: #dc2626;
+}
+
+.signup-password-label.is-warning {
+  color: #d97706;
+}
+
+.signup-password-label.is-success {
+  color: #16a34a;
+}
+
+.signup-password-label.is-neutral {
+  color: #64748b;
+}
+
+.signup-password-bar {
+  margin-top: 10px;
+  height: 8px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  overflow: hidden;
+}
+
+.signup-password-bar-fill {
+  height: 100%;
+  border-radius: inherit;
+  transition: width 180ms ease, background-color 180ms ease;
+}
+
+.signup-password-bar-fill.is-danger {
+  background: linear-gradient(90deg, #ef4444, #fb7185);
+}
+
+.signup-password-bar-fill.is-warning {
+  background: linear-gradient(90deg, #f59e0b, #facc15);
+}
+
+.signup-password-bar-fill.is-success {
+  background: linear-gradient(90deg, #4f46e5, #7c3aed);
+}
+
+.signup-password-subtitle {
+  margin-top: 12px;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.signup-password-list {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  color: #1e293b;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.signup-password-list li {
+  margin-top: 2px;
+}
+
+.signup-password-list li.is-ok {
+  color: #16a34a;
+}
+
+.password-dropdown-enter-active,
+.password-dropdown-leave-active {
+  transition: opacity 140ms ease, transform 140ms ease;
+}
+
+.password-dropdown-enter-from,
+.password-dropdown-leave-to {
+  opacity: 0;
+  transform: translateY(-6px) scaleY(0.98);
+}
+
+.password-dropdown-enter-to,
+.password-dropdown-leave-from {
+  opacity: 1;
+  transform: translateY(0) scaleY(1);
+}
+
+.signup-terms {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding-top: 4px;
+  color: #0f172a;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.signup-checkbox {
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  border-radius: 6px;
+  accent-color: #4f46e5;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.signup-submit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 40px;
+  border-radius: 8px;
+  background: linear-gradient(90deg, #4f46e5 0%, #7c3aed 100%);
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 700;
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);
+  transition: transform var(--transition-fast) var(--ease-out), opacity var(--transition-fast) var(--ease-out), box-shadow var(--transition-fast) var(--ease-out);
+  cursor: pointer;
+}
+
+.signup-submit:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(79, 70, 229, 0.35);
+}
+
+.signup-submit:disabled {
+  opacity: 0.72;
+  cursor: not-allowed;
+}
+
+.signup-submit-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.signup-divider {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  color: #94a3b8;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.signup-divider div {
+  height: 1px;
+  flex: 1;
+  background: #e2e8f0;
+}
+
+.signup-google {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 40px;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition-fast) var(--ease-out), border-color var(--transition-fast) var(--ease-out), color var(--transition-fast) var(--ease-out), box-shadow var(--transition-fast) var(--ease-out), transform var(--transition-fast) var(--ease-out);
+}
+
+.signup-google:hover {
+  background: linear-gradient(90deg, rgba(79, 70, 229, 0.06), rgba(124, 58, 237, 0.06));
+  border-color: #7c3aed;
+  color: #4f46e5;
+  box-shadow: 0 8px 18px rgba(79, 70, 229, 0.12);
+}
+
+.signup-google-icon {
+  width: 21px;
+  height: 21px;
+  flex-shrink: 0;
+}
+</style>

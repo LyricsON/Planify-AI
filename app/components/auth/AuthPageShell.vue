@@ -41,51 +41,32 @@ defineProps<{
       <!-- Right Column (Forms) -->
       <div
         class="flex w-full justify-center bg-[#fafbff] px-8 py-8 sm:px-10 lg:px-12 xl:px-16"
-        :class="align === 'start' ? 'items-start lg:pt-12 lg:pb-16' : 'items-center'"
+        :class="align === 'start' ? 'items-start lg:pt-12 lg:pb-12' : 'items-center'"
       >
         <div
-          class="w-full animate-slide-up px-8 sm:px-12 lg:px-16 xl:px-20"
-          :class="mode === 'signin' ? 'max-w-[680px]' : 'max-w-[660px]'"
+          class="w-full animate-slide-up px-6 sm:px-12 lg:px-14 xl:px-18"
+          :class="mode === 'signin' ? 'max-w-[680px]' : 'max-w-[680px]'"
         >
-          <template v-if="mode === 'signin'">
-            <div
-              class="text-center"
-              :class="mode === 'signin' ? 'auth-card-heading-signin' : 'mb-6 sm:mb-7'"
-            >
-              <h1
-                class="font-extrabold text-[#0f172a]"
-                :class="mode === 'signin' ? 'auth-title-signin' : 'mb-2 text-[1.8rem] sm:text-[2.35rem]'"
-              >
-                {{ title }}
-              </h1>
-              <p
-                class="text-[#475569]"
-                :class="mode === 'signin' ? 'auth-subtitle-signin' : 'text-[0.92rem]'"
-              >
-                {{ subtitle }}
-              </p>
-            </div>
-
-            <slot />
-          </template>
-
           <div
-            v-else
-            class="border border-[#e5e7eb] bg-white shadow-[0_10px_35px_rgba(15,23,42,0.03)] rounded-[1.8rem] px-7 py-7 sm:px-10 sm:py-9"
+            class="text-center"
+            :class="mode === 'signin' ? 'auth-card-heading-signin' : 'auth-card-heading-signin'"
           >
-            <div
-              class="text-center mb-6 sm:mb-7"
+            <slot name="header-top" />
+            <h1
+              class="font-extrabold text-[#0f172a]"
+              :class="mode === 'signin' ? 'auth-title-signin' : 'auth-title-signin'"
             >
-              <h1 class="mb-2 text-[1.8rem] font-extrabold text-[#0f172a] sm:text-[2.35rem]">
-                {{ title }}
-              </h1>
-              <p class="text-[0.92rem] text-[#475569]">
-                {{ subtitle }}
-              </p>
-            </div>
-
-            <slot />
+              {{ title }}
+            </h1>
+            <p
+              class="text-[#475569]"
+              :class="mode === 'signin' ? 'auth-subtitle-signin' : 'auth-subtitle-signin'"
+            >
+              {{ subtitle }}
+            </p>
           </div>
+
+          <slot />
 
           <slot name="after-card" />
         </div>
