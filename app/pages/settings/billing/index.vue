@@ -6,6 +6,7 @@ definePageMeta({ layout: 'dashboard' })
 const billingStore = useBillingStore()
 const { subscription, tokenBalance, tokenUsage, tokenPacks, paymentMethods, paymentHistory, pricingPlans, loading, error } = storeToRefs(billingStore)
 const feedback = ref<{ tone: 'success' | 'warning' | 'info', text: string } | null>(null)
+const router = useRouter()
 
 onMounted(async () => {
   await billingStore.fetchBilling()
@@ -29,24 +30,12 @@ const compactBalance = computed(() => {
 })
 
 const usageBars = computed(() => {
-  const defaults = ['AI Assistant (Answers)', 'Document Analysis', 'Practice Exams', 'Flashcards & Summaries']
-  const normalized = (tokenUsage.value || []).map((item, index) => ({
+  return (tokenUsage.value || []).map((item, index) => ({
     id: item.id || `usage-${index}`,
-    label: item.label && item.label !== 'Usage' ? item.label : defaults[index] || 'Usage',
+    label: item.label,
     tokens: Number(item.tokens || 0),
     percentage: Number(item.percentage || 0)
-  }))
-
-  if (!normalized.length) {
-    return defaults.map((label, index) => ({
-      id: `usage-default-${index}`,
-      label,
-      tokens: 0,
-      percentage: 0
-    }))
-  }
-
-  return normalized.slice(0, 4)
+  })).slice(0, 4)
 })
 
 const currentPlanFeatures = [
@@ -67,13 +56,8 @@ async function buyPack(id: string) {
   }
 }
 
-async function changePlan() {
-  const ok = await billingStore.upgradePlan('pro')
-  await billingStore.fetchBilling()
-  feedback.value = {
-    tone: ok ? 'success' : 'warning',
-    text: ok ? 'Plan upgraded successfully.' : (error.value || 'Unable to change plan.')
-  }
+function changePlan() {
+  router.push('/settings/billing/plans')
 }
 
 async function manageSubscription() {
@@ -172,7 +156,7 @@ async function removePaymentMethod(id: string) {
             </div>
 
             <div class="mt-4 grid gap-3 sm:grid-cols-2">
-              <button class="h-11 rounded-xl border border-[var(--color-primary)] text-sm font-semibold text-[var(--color-primary)]" @click="changePlan">Change Plan</button>
+              <NuxtLink to="/settings/billing/plans" class="flex items-center justify-center h-11 rounded-xl border border-[var(--color-primary)] text-sm font-semibold text-[var(--color-primary)] hover:bg-[var(--color-primary-soft)] transition">Change Plan</NuxtLink>
               <button class="h-11 rounded-xl bg-[var(--color-primary)] text-sm font-semibold text-white" @click="manageSubscription">Manage Subscription</button>
             </div>
           </section>
@@ -220,7 +204,7 @@ async function removePaymentMethod(id: string) {
               </div>
               <p class="mt-3 text-base font-semibold text-[var(--color-text)]">{{ pack.name }}</p>
               <p class="text-sm text-muted">{{ pack.tokens.toLocaleString() }} tokens</p>
-              <p class="mt-2 text-3xl leading-none font-semibold text-[var(--color-text)]">${{ pack.price.toFixed(2) }}</p>
+              <p class="mt-2 text-3xl leading-none font-semibold text-[var(--color-text)]">{{ pack.price.toFixed(2) }} TND</p>
               <button class="mt-4 h-8 w-full rounded-xl border text-sm font-semibold" :class="pack.popular ? 'border-[var(--color-primary)] bg-[var(--color-primary)] text-white' : 'border-[var(--color-border)] text-[var(--color-primary)]'" @click="buyPack(pack.id)">
                 Buy Now
               </button>
@@ -238,7 +222,10 @@ async function removePaymentMethod(id: string) {
           </div>
 
           <div class="space-y-3">
-            <div v-for="method in paymentMethods" :key="method.id" class="flex items-center justify-between rounded-xl border border-[var(--color-border)] px-4 py-3">
+            <div v-if="paymentMethods.length === 0" class="rounded-xl border border-[var(--color-border)] px-4 py-8 text-center text-sm text-muted">
+              No payment methods added yet.
+            </div>
+            <div v-else v-for="method in paymentMethods" :key="method.id" class="flex items-center justify-between rounded-xl border border-[var(--color-border)] px-4 py-3">
               <div class="flex items-center gap-3">
                 <span class="text-base font-bold text-[var(--color-text)]">{{ method.brand.toUpperCase() }}</span>
                 <span class="text-sm text-[var(--color-text)]">{{ method.label }}</span>
@@ -274,7 +261,10 @@ async function removePaymentMethod(id: string) {
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="payment in paymentHistory" :key="payment.id" class="border-b border-[var(--color-border)]/70">
+                <tr v-if="paymentHistory.length === 0">
+                  <td colspan="6" class="py-8 text-center text-sm text-muted">No invoices available.</td>
+                </tr>
+                <tr v-else v-for="payment in paymentHistory" :key="payment.id" class="border-b border-[var(--color-border)]/70">
                   <td class="py-3 font-medium text-[var(--color-text)]">{{ payment.invoiceId || payment.id }}</td>
                   <td class="py-3 text-[var(--color-text)]">{{ payment.date }}</td>
                   <td class="py-3 text-[var(--color-text)]">{{ payment.description }}</td>
@@ -296,7 +286,10 @@ async function removePaymentMethod(id: string) {
           </div>
 
           <div class="space-y-4">
-            <div v-for="item in usageBars" :key="item.id">
+            <div v-if="usageBars.length === 0" class="py-4 text-center text-sm text-muted">
+              No usage data for this period.
+            </div>
+            <div v-else v-for="item in usageBars" :key="item.id">
               <div class="mb-1 flex items-center justify-between text-sm">
                 <span class="text-[var(--color-text)]">{{ item.label }}</span>
                 <span class="text-muted">{{ item.tokens.toLocaleString() }} tokens {{ item.percentage }}%</span>
@@ -330,9 +323,9 @@ async function removePaymentMethod(id: string) {
                 <span>{{ feature }}</span>
               </li>
             </ul>
-            <button class="mt-4 h-10 w-full rounded-xl border border-[var(--color-primary)] text-sm font-semibold text-[var(--color-primary)]" @click="changePlan">
+            <NuxtLink to="/settings/billing/plans" class="mt-4 flex h-10 w-full items-center justify-center rounded-xl border border-[var(--color-primary)] text-sm font-semibold text-[var(--color-primary)] hover:bg-[var(--color-primary-soft)] transition">
               Compare Plans
-            </button>
+            </NuxtLink>
           </div>
         </section>
 
@@ -352,9 +345,9 @@ async function removePaymentMethod(id: string) {
                   <span>{{ feature }}</span>
                 </li>
               </ul>
-              <button class="mt-3 h-10 w-full rounded-xl border border-[var(--color-primary)] text-sm font-semibold text-[var(--color-primary)]" @click="plan.id === 'pro' ? changePlan() : manageSubscription()">
+              <NuxtLink to="/settings/billing/plans" class="mt-3 flex h-10 w-full items-center justify-center rounded-xl border border-[var(--color-primary)] text-sm font-semibold text-[var(--color-primary)] hover:bg-[var(--color-primary-soft)] transition">
                 {{ plan.cta }}
-              </button>
+              </NuxtLink>
             </div>
           </div>
         </section>

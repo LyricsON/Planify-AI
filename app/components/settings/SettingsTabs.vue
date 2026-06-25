@@ -14,6 +14,9 @@ const isActive = (path: string) => {
   if (path === '/settings/profile' && route.path === '/settings/personal-info') {
     return true
   }
+  if (path === '/settings/billing' && route.path === '/settings/billing/plans') {
+    return true
+  }
   return route.path === path
 }
 

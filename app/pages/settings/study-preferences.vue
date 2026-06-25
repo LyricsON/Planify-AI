@@ -112,14 +112,14 @@ async function savePreferences() {
 
     <div
       v-else
-      class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]"
+      class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_400px]"
     >
-      <div class="space-y-6">
+      <div class="space-y-5">
         <SettingsSectionCard
           title="Customize Your Study Experience"
           description="Set your preferences to help Planify AI create the perfect study plan for you."
         >
-          <div class="grid gap-4 md:grid-cols-2">
+          <div class="grid gap-3 md:grid-cols-2">
             <SettingsField
               label="Preferred Study Hours"
               hint="When do you study best?"
@@ -139,7 +139,7 @@ async function savePreferences() {
               label="Preferred Days"
               hint="Days you typically study"
             >
-              <div class="flex flex-wrap gap-2 rounded-2xl border border-[var(--color-border)] p-3">
+              <div class="flex flex-wrap gap-1.5 rounded-xl border border-[var(--color-border)] p-2">
                 <button
                   v-for="day in ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']"
                   :key="day"
@@ -286,31 +286,102 @@ async function savePreferences() {
           title="Scheduling Preferences"
           description="Set how Planify AI schedules and organizes your study plan."
         >
-          <div class="grid gap-3 md:grid-cols-2">
-            <PreferenceToggle
-              v-model="form.autoScheduleSessions"
-              title="Auto-schedule sessions"
-              description="Allow AI to automatically schedule sessions."
-              icon="i-lucide-clock-3"
-            />
-            <PreferenceToggle
-              v-model="form.includeBufferTime"
-              title="Include buffer time"
-              description="Add buffer between back-to-back sessions."
-              icon="i-lucide-hourglass"
-            />
-            <PreferenceToggle
-              v-model="form.smartRescheduling"
-              title="Smart rescheduling"
-              description="Automatically adjust when plans change."
-              icon="i-lucide-wand-sparkles"
-            />
-            <PreferenceToggle
-              v-model="form.weekendStudy"
-              title="Weekend study"
-              description="Include weekends in my schedule."
-              icon="i-lucide-calendar-days"
-            />
+          <!-- Row 1 ─ top pair -->
+          <div class="sched-row sched-row--sep">
+            <!-- Auto-schedule sessions -->
+            <div class="sched-item">
+              <div class="sched-left">
+                <div class="icon-box icon-box-primary !size-8 flex-shrink-0">
+                  <UIcon name="i-lucide-calendar-clock" class="size-4" />
+                </div>
+                <div class="min-w-0">
+                  <p class="sched-title">Auto-schedule sessions</p>
+                  <p class="sched-desc">Allow AI to automatically generate study sessions.</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                :aria-checked="form.autoScheduleSessions"
+                class="sched-toggle"
+                :class="{ 'sched-toggle--on': form.autoScheduleSessions }"
+                @click="form.autoScheduleSessions = !form.autoScheduleSessions"
+              >
+                <span class="sched-toggle-thumb" />
+              </button>
+            </div>
+
+            <!-- Include buffer time -->
+            <div class="sched-item">
+              <div class="sched-left">
+                <div class="icon-box icon-box-primary !size-8 flex-shrink-0">
+                  <UIcon name="i-lucide-clock-3" class="size-4" />
+                </div>
+                <div class="min-w-0">
+                  <p class="sched-title">Include buffer time</p>
+                  <p class="sched-desc">Automatically leave free time between consecutive sessions.</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                :aria-checked="form.includeBufferTime"
+                class="sched-toggle"
+                :class="{ 'sched-toggle--on': form.includeBufferTime }"
+                @click="form.includeBufferTime = !form.includeBufferTime"
+              >
+                <span class="sched-toggle-thumb" />
+              </button>
+            </div>
+          </div>
+
+          <!-- Row 2 ─ bottom pair -->
+          <div class="sched-row">
+            <!-- Smart rescheduling -->
+            <div class="sched-item">
+              <div class="sched-left">
+                <div class="icon-box icon-box-primary !size-8 flex-shrink-0">
+                  <UIcon name="i-lucide-refresh-cw" class="size-4" />
+                </div>
+                <div class="min-w-0">
+                  <p class="sched-title">Smart rescheduling</p>
+                  <p class="sched-desc">Automatically reorganize sessions when deadlines change.</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                :aria-checked="form.smartRescheduling"
+                class="sched-toggle"
+                :class="{ 'sched-toggle--on': form.smartRescheduling }"
+                @click="form.smartRescheduling = !form.smartRescheduling"
+              >
+                <span class="sched-toggle-thumb" />
+              </button>
+            </div>
+
+            <!-- Weekend study -->
+            <div class="sched-item">
+              <div class="sched-left">
+                <div class="icon-box icon-box-primary !size-8 flex-shrink-0">
+                  <UIcon name="i-lucide-calendar-days" class="size-4" />
+                </div>
+                <div class="min-w-0">
+                  <p class="sched-title">Weekend study</p>
+                  <p class="sched-desc">Allow AI to schedule study sessions during weekends.</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                :aria-checked="form.weekendStudy"
+                class="sched-toggle"
+                :class="{ 'sched-toggle--on': form.weekendStudy }"
+                @click="form.weekendStudy = !form.weekendStudy"
+              >
+                <span class="sched-toggle-thumb" />
+              </button>
+            </div>
           </div>
         </SettingsSectionCard>
 
@@ -364,7 +435,7 @@ async function savePreferences() {
           <div class="flex flex-col items-end justify-end gap-3">
             <button
               type="button"
-              class="rounded-xl bg-[var(--color-primary)] px-8 py-4 text-sm font-semibold text-white transition hover:bg-[var(--color-primary-hover)]"
+              class="rounded-xl bg-[var(--color-primary)] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[var(--color-primary-hover)]"
               @click="savePreferences"
             >
               Save Preferences
@@ -376,16 +447,16 @@ async function savePreferences() {
         </div>
       </div>
 
-      <div class="space-y-6">
+      <div class="space-y-5">
         <section class="section-card">
-          <div class="mb-4 flex items-center justify-between gap-3">
-            <h3 class="text-2xl font-semibold text-[var(--color-text)]">
+          <div class="mb-3 flex items-center justify-between gap-3">
+            <h3 class="text-xl font-semibold text-[var(--color-text)]">
               Your Current Study Profile
             </h3>
             <span class="status-badge status-info">Balanced Learner</span>
           </div>
 
-          <div class="space-y-3">
+          <div class="space-y-0">
             <div class="profile-row">
               <span>Study Hours</span><strong>{{ form.preferredStudyHours }}</strong>
             </div>
@@ -404,74 +475,67 @@ async function savePreferences() {
             <div class="profile-row">
               <span>Difficulty</span><strong>{{ form.difficultyPreference }}</strong>
             </div>
-            <div class="profile-row">
+            <div class="profile-row profile-row--last">
               <span>Exam Mode</span><strong>{{ form.examPreparationMode }}</strong>
             </div>
           </div>
-
-          <button
-            type="button"
-            class="mt-6 w-full rounded-xl border border-[var(--color-primary)] px-4 py-3 text-sm font-semibold text-[var(--color-primary)]"
-          >
-            Edit Preferences
-          </button>
         </section>
 
         <section class="section-card">
-          <h3 class="mb-4 text-2xl font-semibold text-[var(--color-text)]">
+          <h3 class="mb-1 text-xl font-semibold text-[var(--color-text)]">
             Recommended by AI
           </h3>
           <p class="mb-4 text-sm text-muted">
             Personalized suggestions to optimize your learning.
           </p>
-          <div class="space-y-3">
+          <div class="space-y-2.5">
             <div
               v-for="item in aiRecommendations"
               :key="item.title"
-              class="rounded-2xl border border-[var(--color-border)] px-4 py-4"
+              class="rounded-xl border border-[var(--color-border)] px-3.5 py-3"
             >
               <div class="flex items-start justify-between gap-3">
                 <div>
                   <p class="text-sm font-semibold text-[var(--color-text)]">
                     {{ item.title }}
                   </p>
-                  <p class="mt-1 text-sm text-muted">
+                  <p class="mt-0.5 text-xs text-muted">
                     {{ item.description }}
                   </p>
                 </div>
-                <span class="status-badge status-neutral">{{ item.badge }}</span>
+                <span class="status-badge status-neutral flex-shrink-0">{{ item.badge }}</span>
               </div>
             </div>
           </div>
           <button
             type="button"
-            class="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-[var(--color-primary)]"
+            class="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--color-primary)]"
           >
             View all suggestions
             <UIcon
               name="i-lucide-arrow-right"
-              class="size-4"
+              class="size-3.5"
             />
           </button>
         </section>
 
         <section class="section-card">
-          <h3 class="mb-4 text-2xl font-semibold text-[var(--color-text)]">
+          <h3 class="mb-1 text-xl font-semibold text-[var(--color-text)]">
             AI Study Summary
           </h3>
           <p class="mb-4 text-sm text-muted">
             How we'll personalize your experience.
           </p>
-          <div class="space-y-3">
+          <div class="space-y-2.5">
             <div
               v-for="item in aiSummary"
               :key="item"
               class="flex items-start gap-3"
             >
-              <div class="icon-box icon-box-success mt-0.5">
+              <div class="icon-box icon-box-success mt-0.5 !size-8">
                 <UIcon
                   name="i-lucide-check"
-                  class="size-4"
+                  class="size-3.5"
                 />
               </div>
               <p class="text-sm text-[var(--color-text-soft)]">
@@ -481,12 +545,12 @@ async function savePreferences() {
           </div>
           <button
             type="button"
-            class="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-[var(--color-primary)]"
+            class="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--color-primary)]"
           >
             Learn more about personalization
             <UIcon
               name="i-lucide-arrow-right"
-              class="size-4"
+              class="size-3.5"
             />
           </button>
         </section>
@@ -496,31 +560,38 @@ async function savePreferences() {
 </template>
 
 <style scoped>
+/* ── Form Controls ─────────────────────────────────────────────────────────── */
 .field-control {
   width: 100%;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-xl);
   background: var(--color-input-bg);
   color: var(--color-text);
-  min-height: 48px;
-  padding: 0 1rem;
-  transition: border-color var(--transition-fast) var(--ease-out), box-shadow var(--transition-fast) var(--ease-out);
+  font-size: 0.9375rem; /* 15px */
+  font-weight: 500;
+  min-height: 42px;
+  padding: 0 0.875rem;
+  transition: border-color var(--transition-fast) var(--ease-out),
+    box-shadow var(--transition-fast) var(--ease-out);
 }
 
 .field-control:focus {
   outline: none;
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 4px var(--color-primary-soft);
+  box-shadow: 0 0 0 3px var(--color-primary-soft);
 }
 
+/* ── Day-of-week Chips ─────────────────────────────────────────────────────── */
 .toggle-chip {
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-xl);
-  padding: 0.625rem 0.875rem;
-  font-size: 0.875rem;
+  border-radius: var(--radius-lg);
+  padding: 0.375rem 0.75rem;
+  font-size: 0.8125rem; /* 13px */
   font-weight: 600;
   color: var(--color-text-soft);
-  transition: background var(--transition-fast) var(--ease-out), color var(--transition-fast) var(--ease-out), border-color var(--transition-fast) var(--ease-out);
+  transition: background var(--transition-fast) var(--ease-out),
+    color var(--transition-fast) var(--ease-out),
+    border-color var(--transition-fast) var(--ease-out);
 }
 
 .toggle-chip--active {
@@ -529,14 +600,16 @@ async function savePreferences() {
   color: var(--color-primary);
 }
 
+/* ── Theme Cards ───────────────────────────────────────────────────────────── */
 .theme-card {
   display: flex;
   align-items: center;
-  gap: 0.875rem;
+  gap: 0.75rem;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-2xl);
-  padding: 1rem;
-  transition: border-color var(--transition-fast) var(--ease-out), background var(--transition-fast) var(--ease-out);
+  border-radius: var(--radius-xl);
+  padding: 0.75rem;
+  transition: border-color var(--transition-fast) var(--ease-out),
+    background var(--transition-fast) var(--ease-out);
 }
 
 .theme-card--active {
@@ -544,18 +617,130 @@ async function savePreferences() {
   background: var(--color-primary-soft);
 }
 
+/* ── Study Profile Summary Rows ────────────────────────────────────────────── */
 .profile-row {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   gap: 1rem;
   border-bottom: 1px solid var(--color-border);
-  padding: 0.875rem 0;
+  padding: 0.5rem 0;
+  font-size: 0.875rem; /* 14px */
   color: var(--color-text-soft);
+}
+
+.profile-row--last {
+  border-bottom: none;
 }
 
 .profile-row strong {
   text-align: right;
+  font-size: 0.875rem;
+  font-weight: 700;
   color: var(--color-text);
+}
+
+/* ── Scheduling Preferences ─────────────────────────────────────────────────── */
+.sched-row {
+  display: grid;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 768px) {
+  .sched-row {
+    grid-template-columns: 1fr 1fr;
+    gap: 0 1.5rem;
+  }
+}
+
+.sched-row--sep {
+  border-bottom: 1px solid var(--color-border);
+}
+
+.sched-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.875rem;
+  padding: 0.875rem 0;
+}
+
+/* On mobile, stack items with individual separators */
+@media (max-width: 767px) {
+  .sched-row--sep .sched-item {
+    border-bottom: 1px solid var(--color-border);
+  }
+  .sched-row--sep .sched-item:last-child {
+    border-bottom: none;
+  }
+  .sched-row:not(.sched-row--sep) .sched-item:not(:last-child) {
+    border-bottom: 1px solid var(--color-border);
+  }
+}
+
+.sched-left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.sched-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text);
+  line-height: 1.3;
+  margin: 0;
+}
+
+.sched-desc {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  line-height: 1.4;
+  margin: 0.125rem 0 0;
+}
+
+/* ── Pill Toggle Switch ──────────────────────────────────────────────────────── */
+.sched-toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  width: 44px;
+  height: 24px;
+  border-radius: 9999px;
+  background: var(--color-border);
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  padding: 0;
+}
+
+.sched-toggle:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--color-primary-soft);
+}
+
+.sched-toggle--on {
+  background: var(--color-primary);
+}
+
+.sched-toggle-thumb {
+  position: absolute;
+  left: 2px;
+  top: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 9999px;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+  transition: transform 0.2s ease;
+  pointer-events: none;
+}
+
+.sched-toggle--on .sched-toggle-thumb {
+  transform: translateX(20px);
 }
 </style>
 
