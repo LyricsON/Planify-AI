@@ -29,8 +29,10 @@ const initials = computed(() => {
   const n = (props.name || '').trim()
   if (!n) return '?'
   const parts = n.split(/\s+/).filter(Boolean)
-  if (parts.length === 1) return parts[0].charAt(0).toUpperCase()
-  return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase()
+  const first = parts[0] || ''
+  const last = parts[parts.length - 1] || first
+  if (parts.length === 1) return first.charAt(0).toUpperCase()
+  return (first.charAt(0) + last.charAt(0)).toUpperCase()
 })
 
 /** Whether a real image src is available */
