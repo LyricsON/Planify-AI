@@ -36,7 +36,7 @@ function normalizeSubscription(payload: any): SubscriptionPlan | null {
     status: String(payload.status || 'unknown'),
     nextBillingDate: payload.nextBillingDate ? new Date(payload.nextBillingDate).toISOString() : '',
     billingCycle: String(payload.billingCycle || 'none'),
-    feeLabel: Number.isFinite(price) && price > 0 ? `$${price.toFixed(2)} / ${payload.billingCycle || 'month'}` : '$0.00 / month',
+    feeLabel: Number.isFinite(price) && price > 0 ? `${price.toFixed(2)} TND / ${payload.billingCycle || 'month'}` : '0.00 TND / month',
     description: String(payload.description || 'Billing details from your current subscription.'),
     monthlyTokenLimit: Number(payload.tokenLimit || 0) || 0
   }
@@ -59,19 +59,31 @@ function normalizeTokenBalance(payload: any, subscription: SubscriptionPlan | nu
 function normalizeTokenUsage(items: unknown): TokenUsageCategory[] {
   if (!Array.isArray(items)) return []
 
-  const total = items.reduce((sum: number, item: any) => sum + Math.abs(Number(item?.amount || item?.tokens || 0)), 0)
-
-  return items.slice(0, 8).map((item: any, index: number) => {
-    const amount = Math.abs(Number(item?.amount ?? item?.tokens ?? item?.usedTokens ?? 0))
-    const percentage = total > 0 ? Math.round((amount / total) * 100) : 0
-
-    return {
-      id: String(item?._id || item?.id || `usage-${index + 1}`),
-      label: String(item?.reason || item?.label || item?.name || 'Usage'),
-      tokens: Number.isFinite(amount) ? amount : 0,
-      percentage: Number.isFinite(percentage) ? percentage : 0
-    }
+  const usageItems = items.filter((item: any) => {
+    const val = Number(item?.amount ?? item?.tokens ?? 0)
+    return val < 0
   })
+
+  const grouped = usageItems.reduce((acc: Record<string, number>, item: any) => {
+    const label = String(item?.reason || item?.label || item?.name || 'Usage')
+    const amount = Math.abs(Number(item?.amount ?? item?.tokens ?? 0))
+    acc[label] = (acc[label] || 0) + amount
+    return acc
+  }, {})
+
+  const totalUsage = Object.values(grouped).reduce((sum: number, val) => sum + (val as number), 0)
+
+  return Object.entries(grouped)
+    .map(([label, amount], index) => {
+      const percentage = totalUsage > 0 ? Math.round(((amount as number) / totalUsage) * 100) : 0
+      return {
+        id: `usage-group-${index + 1}`,
+        label,
+        tokens: amount as number,
+        percentage
+      }
+    })
+    .sort((a, b) => b.tokens - a.tokens)
 }
 
 function normalizePayments(items: unknown): PaymentHistoryItem[] {
@@ -86,7 +98,7 @@ function normalizePayments(items: unknown): PaymentHistoryItem[] {
       invoiceId: String(payment?.invoiceNumber || payment?.invoiceId || payment?._id || `INV-${index + 1}`),
       date: dateLabel,
       description: String(payment?.description || payment?.type || 'Payment'),
-      amount: typeof payment?.amount === 'number' ? `$${payment.amount.toFixed(2)}` : String(payment?.amount || '$0.00'),
+      amount: typeof payment?.amount === 'number' ? `${payment.amount.toFixed(2)} TND` : String(payment?.amount || '0.00 TND'),
       status: String(payment?.status || 'paid')
     }
   })
@@ -110,7 +122,7 @@ function normalizePlans(items: unknown): PricingPlan[] {
   return items.map((plan: any, index: number) => ({
     id: String(plan?.id || plan?.plan || `plan-${index + 1}`),
     name: String(plan?.name || 'Plan'),
-    priceLabel: String(plan?.priceLabel || '$0 / month'),
+    priceLabel: String(plan?.priceLabel || '0 TND / month'),
     badge: plan?.badge ? String(plan.badge) : undefined,
     features: Array.isArray(plan?.features) ? plan.features.map((f: any) => String(f)) : [],
     cta: String(plan?.cta || 'Choose Plan')
@@ -184,21 +196,18 @@ export const useBillingStore = defineStore('billing', {
       }
 
       const api = useApi()
-      const [tokenRes, paymentRes] = await Promise.all([
-        api.post('/tokens/buy-demo', { amount: pack.tokens }),
-        api.post('/payments/demo', {
-          amount: pack.price,
-          type: 'token_pack',
-          description: `${pack.name} (${pack.tokens.toLocaleString()} tokens)`,
-          tokenAmount: pack.tokens
-        })
-      ])
+      const paymentRes = await api.post('/payments/demo', {
+        amount: pack.price,
+        type: 'token_pack',
+        description: `${pack.name} (${pack.tokens.toLocaleString()} tokens)`,
+        tokenAmount: pack.tokens
+      })
 
-      if (!tokenRes.success || !paymentRes.success) {
-        this.error = tokenRes.message || paymentRes.message || 'Unable to complete token purchase.'
+      if (!paymentRes.success) {
+        this.error = paymentRes.message || 'Unable to complete token purchase.'
       }
 
-      return tokenRes.success && paymentRes.success
+      return paymentRes.success
     },
 
     async upgradePlan(planId = 'pro') {
