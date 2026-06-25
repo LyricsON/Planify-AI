@@ -39,7 +39,7 @@ const mockNotificationPreferences: NotificationPreferences = {
   notificationFrequency: 'important'
 }
 
-const mockStudyPreferences: StudyPreferences = {
+const defaultStudyPreferences: StudyPreferences = {
   preferredStudyHours: 'Morning (8AM - 12PM)',
   preferredDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
   focusSessionLength: 90,
@@ -102,7 +102,8 @@ const mockSecurityTips: SecurityTip[] = [
 export const useSettingsStore = defineStore('settings', {
   state: () => ({
     preferences: clone(mockNotificationPreferences) as NotificationPreferences,
-    studyPreferences: clone(mockStudyPreferences) as StudyPreferences,
+    studyPreferences: clone(defaultStudyPreferences) as StudyPreferences,
+    studyPreferencesLoaded: false,
     security: clone(mockSecurityOverview) as SecurityOverview,
     sessions: clone(mockSessions) as SecuritySession[],
     loginHistory: clone(mockLoginHistory) as LoginHistoryItem[],
@@ -111,6 +112,7 @@ export const useSettingsStore = defineStore('settings', {
     additionalSecurity: clone(defaultAdditionalSecurity) as AdditionalSecurityOption[],
     securityTips: clone(mockSecurityTips) as SecurityTip[],
     securityPrefsLoading: false,
+    studyLoading: false,
     loading: false,
     error: '' as string | null,
     usingMockData: false
@@ -118,7 +120,7 @@ export const useSettingsStore = defineStore('settings', {
   actions: {
     applyMockData(message?: string) {
       this.preferences = clone(mockNotificationPreferences)
-      this.studyPreferences = clone(mockStudyPreferences)
+      // studyPreferences are NOT set to mock here — they use real or default values
       this.security = clone(mockSecurityOverview)
       this.sessions = clone(mockSessions)
       this.loginHistory = clone(mockLoginHistory)
@@ -137,13 +139,10 @@ export const useSettingsStore = defineStore('settings', {
       const api = useApi()
 
       try {
-        const [notificationRes, studyRes] = await Promise.all([
-          api.get<Partial<NotificationPreferences>>('/preferences/me'),
-          api.get<Partial<StudyPreferences>>('/preferences/me', { section: 'study' })
-        ])
+        const notificationRes = await api.get<Partial<NotificationPreferences>>('/preferences/me')
 
-        if (!notificationRes.success && !studyRes.success) {
-          throw new Error(notificationRes.message || studyRes.message || 'Preferences request failed')
+        if (!notificationRes.success) {
+          throw new Error(notificationRes.message || 'Preferences request failed')
         }
 
         this.preferences = {
@@ -151,16 +150,37 @@ export const useSettingsStore = defineStore('settings', {
           ...notificationRes.data
         }
 
-        this.studyPreferences = {
-          ...clone(mockStudyPreferences),
-          ...studyRes.data
-        }
-
         this.usingMockData = false
       } catch (error: any) {
         this.applyMockData(error?.message || 'Backend unavailable. Showing demo preferences.')
       } finally {
         this.loading = false
+      }
+    },
+    async fetchStudyPreferences() {
+      this.studyLoading = true
+      this.error = null
+
+      const api = useApi()
+
+      try {
+        const res = await api.get<StudyPreferences>('/study-preferences/me')
+
+        if (!res.success) {
+          throw new Error(res.message || 'Study preferences request failed')
+        }
+
+        this.studyPreferences = {
+          ...clone(defaultStudyPreferences),
+          ...res.data
+        }
+        this.studyPreferencesLoaded = true
+        this.usingMockData = false
+      } catch (error: any) {
+        this.error = error?.message || 'Unable to load study preferences.'
+        this.usingMockData = true
+      } finally {
+        this.studyLoading = false
       }
     },
     async updateNotifications(payload: NotificationPreferences) {
@@ -176,15 +196,19 @@ export const useSettingsStore = defineStore('settings', {
       return response.success
     },
     async updateStudyPreferences(payload: StudyPreferences) {
+      // Optimistic update
       this.studyPreferences = clone(payload)
 
       const api = useApi()
-      const response = await api.put('/preferences/me', {
-        section: 'study',
-        ...payload
-      })
+      const response = await api.put<StudyPreferences>('/study-preferences/me', payload)
 
-      if (!response.success) {
+      if (response.success && response.data) {
+        // Apply the authoritative data returned by the server
+        this.studyPreferences = {
+          ...clone(defaultStudyPreferences),
+          ...response.data
+        }
+      } else {
         this.error = response.message || 'Unable to save study preferences.'
       }
 

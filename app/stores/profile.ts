@@ -124,24 +124,30 @@ export const useProfileStore = defineStore('profile', {
 
       const api = useApi()
       try {
-        const [
-          authRes,
-          userRes,
-          profileRes,
-          preferencesRes,
-          subscriptionRes,
-          tokenBalanceRes,
-          tokenHistoryRes,
-          tasksRes,
-          coursesRes,
-          filesRes,
-          sessionsRes,
-          securityRes,
-          aiHistoryRes
-        ] = await Promise.all([
-          api.get<any>('/auth/me'),
+        // 1. Fetch required endpoints
+        const [userRes, profileRes] = await Promise.all([
           api.get<any>('/users/me'),
-          api.get<any>('/profile/me'),
+          api.get<any>('/profile/me')
+        ])
+
+        // Verify required data
+        const rawUserData = userRes.success ? userRes.data : null
+        const userData = rawUserData?.user || rawUserData?.data || rawUserData
+        const profileData = profileRes.success ? profileRes.data : null
+
+        if (!userData || !profileData) {
+          if (userRes.statusCode === 401 || profileRes.statusCode === 401) {
+            this.error = 'Your session has expired. Please sign in again.'
+          } else {
+            this.error = 'Unable to load profile. Please refresh this page or sign in again.'
+          }
+          console.error('[Profile Fetch Error] Required data failed:', { userRes, profileRes })
+          return
+        }
+
+        // 2. Fetch optional endpoints concurrently using Promise.allSettled
+        const optionalPromises = [
+          api.get<any>('/auth/me'),
           api.get<any>('/preferences/me'),
           api.get<any>('/subscriptions/me'),
           api.get<any>('/tokens/balance'),
@@ -152,20 +158,37 @@ export const useProfileStore = defineStore('profile', {
           api.get<any>('/study-sessions'),
           api.get<any>('/security-logs'),
           api.get<any>('/ai/history')
-        ])
+        ]
 
-        const rawUserData = (userRes.success ? userRes.data : authRes.success ? authRes.data : null) as any
-        const userData = rawUserData?.user || rawUserData?.data || rawUserData
-        if (!userData) {
-          if (authRes.statusCode === 401 || userRes.statusCode === 401) {
-            this.error = 'Your session has expired. Please sign in again.'
+        const optionalResults = await Promise.allSettled(optionalPromises)
+
+        // Helper to extract response safely, logging failures to console in development
+        const getOptionalResponse = (index: number, endpoint: string) => {
+          const result = optionalResults[index]
+          if (result.status === 'fulfilled') {
+            if (result.value.success) {
+              return result.value
+            } else {
+              console.warn(`[Profile Fetch Warning] Optional endpoint "${endpoint}" returned success=false:`, result.value)
+            }
           } else {
-            this.error = userRes.message || authRes.message || 'Unable to load user profile.'
+            console.error(`[Profile Fetch Error] Optional endpoint "${endpoint}" rejected:`, result.reason)
           }
-          return
+          return { success: false, data: null }
         }
 
-        const profileData = ((profileRes.success ? profileRes.data : {}) || {}) as any
+        const authRes = getOptionalResponse(0, '/auth/me')
+        const preferencesRes = getOptionalResponse(1, '/preferences/me')
+        const subscriptionRes = getOptionalResponse(2, '/subscriptions/me')
+        const tokenBalanceRes = getOptionalResponse(3, '/tokens/balance')
+        const tokenHistoryRes = getOptionalResponse(4, '/tokens/history')
+        const tasksRes = getOptionalResponse(5, '/tasks')
+        const coursesRes = getOptionalResponse(6, '/courses')
+        const filesRes = getOptionalResponse(7, '/files')
+        const sessionsRes = getOptionalResponse(8, '/study-sessions')
+        const securityRes = getOptionalResponse(9, '/security-logs')
+        const aiHistoryRes = getOptionalResponse(10, '/ai/history')
+
         const preferencesData = ((preferencesRes.success ? preferencesRes.data : {}) || {}) as any
         const subscriptionData = ((subscriptionRes.success ? subscriptionRes.data : {}) || {}) as any
         const tokenData = ((tokenBalanceRes.success ? tokenBalanceRes.data : {}) || {}) as any
@@ -493,13 +516,10 @@ export const useProfileStore = defineStore('profile', {
           }
         ]
 
-        if (!profileRes.success && profileRes.statusCode === 401) {
-          this.error = 'Your session has expired. Please sign in again.'
-        } else if (!profileRes.success || !preferencesRes.success || !subscriptionRes.success) {
-          this.error = 'Some profile sections could not be loaded. Available data is shown.'
-        }
+        // We do not set this.error for optional failures, keeping the experience clean.
       } catch (error: any) {
-        this.error = error?.message || 'Unable to load profile data.'
+        this.error = 'Unable to load profile. Please refresh this page or sign in again.'
+        console.error('[Profile Fetch Exception]:', error)
       } finally {
         this.loading = false
       }

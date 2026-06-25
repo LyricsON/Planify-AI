@@ -145,13 +145,7 @@ function managePlan() {
       {{ feedback.text }}
     </div>
 
-    <!-- Partial-load error banner (non-fatal) -->
-    <div
-      v-if="error && !loading"
-      class="glass-card rounded-2xl px-4 py-3 text-sm text-[var(--color-text-soft)]"
-    >
-      {{ error }}
-    </div>
+
 
     <!-- Loading Spinner -->
     <div
