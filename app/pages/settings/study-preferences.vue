@@ -5,7 +5,7 @@ import type { StudyPreferences } from '~/types/settings'
 definePageMeta({ layout: 'dashboard' })
 
 const settingsStore = useSettingsStore()
-const { studyPreferences, loading, error, usingMockData } = storeToRefs(settingsStore)
+const { studyPreferences, studyLoading, error, usingMockData } = storeToRefs(settingsStore)
 const feedback = ref<{ tone: 'success' | 'warning', text: string } | null>(null)
 
 const form = reactive<StudyPreferences>({
@@ -39,12 +39,13 @@ const aiSummary = [
   'Your exam prep will balance learning and practice.'
 ]
 
+// Sync form whenever the store state changes (e.g. after fetch completes)
 watch(studyPreferences, (value) => {
   Object.assign(form, JSON.parse(JSON.stringify(value)))
 }, { immediate: true, deep: true })
 
 onMounted(async () => {
-  await settingsStore.fetchPreferences()
+  await settingsStore.fetchStudyPreferences()
 })
 
 function toggleDay(day: string) {
@@ -93,7 +94,7 @@ async function savePreferences() {
     </div>
 
     <div
-      v-if="loading"
+      v-if="studyLoading"
       class="grid gap-6 xl:grid-cols-[1fr_420px]"
     >
       <div class="space-y-6">

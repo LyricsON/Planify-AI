@@ -52,9 +52,20 @@ export function useApi() {
   async function request<T>(path: string, options: Record<string, any> = {}): Promise<ApiResponse<T>> {
     try {
       const token = getToken()
+      
+      let deviceId = null
+      if (import.meta.client) {
+        deviceId = localStorage.getItem('planify_device_id')
+        if (!deviceId) {
+          deviceId = 'dev_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
+          localStorage.setItem('planify_device_id', deviceId)
+        }
+      }
+
       const headers = {
         ...(options?.headers as Record<string, string> | undefined),
-        ...(token ? { Authorization: `Bearer ${token}` } : {})
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(deviceId ? { 'x-device-id': deviceId } : {})
       }
 
       const payload = await $fetch<T | ApiResponse<T>>(path, {
