@@ -150,7 +150,7 @@ export const useProfileStore = defineStore('profile', {
           api.get<any>('/courses'),
           api.get<any>('/files'),
           api.get<any>('/study-sessions'),
-          api.get<any>('/security/logs'),
+          api.get<any>('/security-logs'),
           api.get<any>('/ai/history')
         ])
 
@@ -200,10 +200,18 @@ export const useProfileStore = defineStore('profile', {
         const profileGoals = Array.isArray(profileData?.goals) ? profileData.goals : []
         const computedGoals: StudyGoal[] = profileGoals
           .map((goal: any, index: number) => ({
-            id: String(goal.id || `goal-${index + 1}`),
+            id: String(goal.id || goal._id || `goal-${index + 1}`),
             title: String(goal.title || goal.name || 'Untitled goal'),
-            progress: Math.max(0, Math.min(100, Number(goal.progress || goal.completion || 0))),
-            tone: (['success', 'danger', 'primary', 'warning', 'info'].includes(goal.tone) ? goal.tone : 'primary') as StudyGoal['tone']
+            description: goal.description,
+            targetValue: Number(goal.targetValue ?? 0),
+            currentValue: Number(goal.currentValue ?? 0),
+            unit: goal.unit,
+            deadline: goal.deadline,
+            status: (goal.status || 'active') as StudyGoal['status'],
+            progress: Math.max(0, Math.min(100, Number(goal.progress ?? 0))),
+            tone: (['success', 'danger', 'primary', 'warning', 'info'].includes(goal.tone) ? goal.tone : 'primary') as StudyGoal['tone'],
+            createdAt: goal.createdAt,
+            updatedAt: goal.updatedAt
           }))
 
         const achievementList: Achievement[] = []
@@ -225,50 +233,144 @@ export const useProfileStore = defineStore('profile', {
           achievementList.push({ id: 'consistent', title: 'Consistent', description: 'Active this week', icon: 'i-lucide-shield-check', tone: 'primary' })
         }
 
-        const activities: ActivityItem[] = [
-          ...completedTasks.slice(0, 5).map((task) => ({
-            id: `task-${task.id}`,
-            title: `Completed task "${task.title || 'Untitled task'}"`,
-            timeAgo: formatRelative(task.completedAt || task.updatedAt || task.createdAt),
-            icon: 'i-lucide-circle-check-big',
-            tone: 'success' as const,
-            date: task.completedAt || task.updatedAt || task.createdAt || ''
-          })),
-          ...files.slice(0, 5).map((file) => ({
-            id: `file-${file.id}`,
-            title: `Uploaded file "${file.name || file.filename || 'Untitled file'}"`,
-            timeAgo: formatRelative(file.updatedAt || file.createdAt),
-            icon: 'i-lucide-file-up',
-            tone: 'info' as const,
-            date: file.updatedAt || file.createdAt || ''
-          })),
-          ...sessions.slice(0, 5).map((session) => ({
-            id: `session-${session.id}`,
-            title: `Study session "${session.title || 'Untitled session'}"`,
-            timeAgo: formatRelative(session.completedAt || session.startedAt || session.updatedAt || session.createdAt),
-            icon: 'i-lucide-book-marked',
-            tone: 'primary' as const,
-            date: session.completedAt || session.startedAt || session.updatedAt || session.createdAt || ''
-          })),
-          ...aiHistory.slice(0, 3).map((event: any, index: number) => ({
-            id: `ai-${event.id || index}`,
-            title: 'Used AI assistant',
-            timeAgo: formatRelative(event.createdAt || event.updatedAt),
-            icon: 'i-lucide-sparkles',
-            tone: 'warning' as const,
-            date: event.createdAt || event.updatedAt || ''
-          })),
-          ...securityLogs.slice(0, 2).map((log: any, index: number) => ({
-            id: `security-${log.id || index}`,
-            title: log.action ? `Security: ${String(log.action)}` : 'Security event',
-            timeAgo: formatRelative(log.createdAt || log.timestamp),
-            icon: 'i-lucide-shield',
-            tone: 'warning' as const,
-            date: log.createdAt || log.timestamp || ''
+        const tokenTransactions = toArray<any>(tokenHistoryRes)
+
+        const allActivities: ActivityItem[] = []
+
+        // 1. Tasks
+        tasks.forEach((task) => {
+          if (task.createdAt) {
+            allActivities.push({
+              id: `task-created-${task.id}`,
+              type: 'task_created',
+              label: `Created task "${task.title || 'Untitled task'}"`,
+              icon: 'i-lucide-circle-plus',
+              color: 'info',
+              createdAt: task.createdAt
+            })
+          }
+          if ((task.status || '').toLowerCase() === 'completed') {
+            const completedDate = task.completedAt || task.updatedAt || task.createdAt
+            if (completedDate) {
+              allActivities.push({
+                id: `task-completed-${task.id}`,
+                type: 'task_completed',
+                label: `Completed task "${task.title || 'Untitled task'}"`,
+                icon: 'i-lucide-circle-check-big',
+                color: 'success',
+                createdAt: completedDate
+              })
+            }
+          }
+        })
+
+        // 2. Files
+        files.forEach((file) => {
+          const fileDate = file.createdAt
+          if (fileDate) {
+            allActivities.push({
+              id: `file-uploaded-${file.id}`,
+              type: 'file_uploaded',
+              label: `Uploaded file "${file.originalName || file.name || file.filename || 'Untitled file'}"`,
+              icon: 'i-lucide-file-up',
+              color: 'info',
+              createdAt: fileDate
+            })
+          }
+        })
+
+        // 3. Courses
+        courses.forEach((course) => {
+          if (course.createdAt) {
+            allActivities.push({
+              id: `course-created-${course.id}`,
+              type: 'course_created',
+              label: `Created course "${course.title || 'Untitled course'}"`,
+              icon: 'i-lucide-book-open',
+              color: 'primary',
+              createdAt: course.createdAt
+            })
+          }
+        })
+
+        // 4. Study Sessions
+        sessions.forEach((session) => {
+          if ((session.status || '').toLowerCase() === 'completed') {
+            const sessionDate = session.completedAt || session.endTime || session.updatedAt || session.createdAt
+            if (sessionDate) {
+              allActivities.push({
+                id: `session-completed-${session.id}`,
+                type: 'session_completed',
+                label: `Completed study session "${session.title || 'Untitled session'}"`,
+                icon: 'i-lucide-book-marked',
+                color: 'success',
+                createdAt: sessionDate
+              })
+            }
+          }
+        })
+
+        // 5. AI Requests
+        aiHistory.forEach((aiReq) => {
+          if (aiReq.createdAt) {
+            allActivities.push({
+              id: `ai-request-${aiReq.id || aiReq._id}`,
+              type: 'ai_request',
+              label: `Used AI assistant for ${aiReq.type ? aiReq.type.replace('_', ' ') : 'chat'}`,
+              icon: 'i-lucide-sparkles',
+              color: 'warning',
+              createdAt: aiReq.createdAt
+            })
+          }
+        })
+
+        // 6. Token Transactions
+        tokenTransactions.forEach((tx) => {
+          if (tx.createdAt) {
+            const amount = Number(tx.amount || 0)
+            const label = amount < 0
+              ? `Used ${Math.abs(amount)} tokens for ${tx.reason || 'AI action'}`
+              : `Received ${amount} tokens for ${tx.reason || 'bonus/purchase'}`
+            allActivities.push({
+              id: `token-tx-${tx.id || tx._id}`,
+              type: 'token_tx',
+              label,
+              icon: 'i-lucide-database',
+              color: amount < 0 ? 'warning' : 'success',
+              createdAt: tx.createdAt
+            })
+          }
+        })
+
+        // 7. Security Logs
+        securityLogs.forEach((log) => {
+          const logDate = log.createdAt || log.timestamp
+          if (logDate) {
+            let label = ''
+            if (log.action === 'login') label = 'Signed in successfully'
+            else if (log.action === 'register') label = 'Registered new account'
+            else if (log.action === 'password_change') label = 'Changed password'
+            else if (log.action === 'profile_update') label = 'Updated profile'
+            else if (log.action === 'logout') label = 'Signed out'
+            else label = log.action ? `Security: ${String(log.action).replace('_', ' ')}` : 'Security event'
+
+            allActivities.push({
+              id: `security-log-${log.id || log._id}`,
+              type: 'security_log',
+              label,
+              icon: 'i-lucide-shield',
+              color: log.status === 'failed' ? 'warning' : 'info',
+              createdAt: logDate
+            })
+          }
+        })
+
+        const activities = allActivities
+          .sort((a, b) => (asDate(b.createdAt)?.getTime() || 0) - (asDate(a.createdAt)?.getTime() || 0))
+          .map((activity) => ({
+            ...activity,
+            timeAgo: formatRelative(activity.createdAt)
           }))
-        ]
-          .sort((a, b) => (asDate(b.date)?.getTime() || 0) - (asDate(a.date)?.getTime() || 0))
-          .slice(0, 8)
 
         const checklist: ProfileChecklistItem[] = [
           { id: 'picture', label: 'Add profile picture', completed: Boolean(userData.avatar || profileData.avatar) },
@@ -520,6 +622,63 @@ export const useProfileStore = defineStore('profile', {
       anchor.click()
       document.body.removeChild(anchor)
       URL.revokeObjectURL(url)
+    },
+
+    async addStudyGoal(payload: {
+      title: string
+      description?: string
+      targetValue: number
+      currentValue: number
+      unit?: string
+      deadline?: string
+      status?: string
+    }) {
+      const api = useApi()
+      const res = await api.post<any>('/profile/goals', payload)
+      if (res.success) {
+        await this.fetchProfile()
+        return { success: true }
+      }
+      this.error = res.message || 'Unable to add study goal.'
+      return { success: false, error: this.error }
+    },
+
+    async updateStudyGoal(goalId: string, payload: {
+      title: string
+      description?: string
+      targetValue: number
+      currentValue: number
+      unit?: string
+      deadline?: string
+      status?: string
+    }) {
+      const api = useApi()
+      const res = await api.put<any>(`/profile/goals/${goalId}`, payload)
+      if (res.success) {
+        await this.fetchProfile()
+        return { success: true }
+      }
+      this.error = res.message || 'Unable to update study goal.'
+      return { success: false, error: this.error }
+    },
+
+    async deleteStudyGoal(goalId: string) {
+      const api = useApi()
+      const res = await api.del<any>(`/profile/goals/${goalId}`)
+      if (res.success) {
+        await this.fetchProfile()
+        return { success: true }
+      }
+      this.error = res.message || 'Unable to delete study goal.'
+      return { success: false, error: this.error }
+    },
+
+    updateRelativeTimes() {
+      if (!this.recentActivity) return
+      this.recentActivity = this.recentActivity.map((activity) => ({
+        ...activity,
+        timeAgo: formatRelative(activity.createdAt)
+      }))
     }
   }
 })

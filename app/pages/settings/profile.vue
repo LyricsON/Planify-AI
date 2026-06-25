@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
+import type { StudyGoal } from '~/types/profile'
 definePageMeta({ layout: 'dashboard' })
 
 const profileStore = useProfileStore()
@@ -12,8 +13,23 @@ const feedback = ref<{ tone: 'success' | 'warning' | 'info', text: string } | nu
 /** Controls Edit Profile modal + breadcrumb */
 const isEditModalOpen = ref(false)
 
+/** Controls Add/Edit Goal modal */
+const isGoalModalOpen = ref(false)
+const activeGoal = ref<StudyGoal | null>(null)
+
+let relativeTimeTimer: any = null
+
 onMounted(async () => {
   await profileStore.fetchProfile()
+  relativeTimeTimer = setInterval(() => {
+    profileStore.updateRelativeTimes()
+  }, 60000)
+})
+
+onBeforeUnmount(() => {
+  if (relativeTimeTimer) {
+    clearInterval(relativeTimeTimer)
+  }
 })
 
 function openEditModal() {
@@ -29,6 +45,33 @@ async function onProfileSaved() {
   // Re-fetch everything so avatar, stats, completion, and sidebar all update
   await profileStore.fetchProfile()
   feedback.value = { tone: 'success', text: 'Your profile has been updated.' }
+}
+
+function openAddGoalModal() {
+  activeGoal.value = null
+  isGoalModalOpen.value = true
+}
+
+function openEditGoalModal(goal: StudyGoal) {
+  activeGoal.value = goal
+  isGoalModalOpen.value = true
+}
+
+async function handleDeleteGoal(id: string) {
+  if (confirm('Are you sure you want to delete this study goal?')) {
+    const res = await profileStore.deleteStudyGoal(id)
+    if (res.success) {
+      feedback.value = { tone: 'success', text: 'Study goal deleted successfully.' }
+    } else {
+      feedback.value = { tone: 'warning', text: res.error || 'Failed to delete study goal.' }
+    }
+  }
+}
+
+async function onGoalSaved() {
+  isGoalModalOpen.value = false
+  activeGoal.value = null
+  feedback.value = { tone: 'success', text: 'Study goal saved successfully.' }
 }
 
 function handleChecklistClick(id: string) {
@@ -187,7 +230,14 @@ function managePlan() {
         </div>
 
         <div class="grid gap-5 lg:grid-cols-2">
-          <ProfileGoalsCard :goals="goals" id="profile-goals-section" class="transition-all duration-300" />
+          <ProfileGoalsCard
+            :goals="goals"
+            id="profile-goals-section"
+            class="transition-all duration-300"
+            @add-goal="openAddGoalModal"
+            @edit-goal="openEditGoalModal"
+            @delete-goal="handleDeleteGoal"
+          />
           <ProfileAchievementsCard :achievements="achievements" />
         </div>
 
@@ -352,6 +402,14 @@ function managePlan() {
       v-if="isEditModalOpen"
       @close="closeEditModal"
       @saved="onProfileSaved"
+    />
+
+    <!-- Add/Edit Goal Modal -->
+    <ProfileGoalModal
+      v-if="isGoalModalOpen"
+      :goal="activeGoal"
+      @close="isGoalModalOpen = false"
+      @saved="onGoalSaved"
     />
   </section>
 </template>

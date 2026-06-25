@@ -52,8 +52,16 @@ export interface ProfileStat {
 export interface StudyGoal {
   id: string
   title: string
+  description?: string
+  targetValue: number
+  currentValue: number
+  unit?: string
+  deadline?: string
+  status: 'active' | 'completed' | 'archived'
   progress: number
   tone: 'success' | 'danger' | 'primary' | 'warning' | 'info'
+  createdAt?: string
+  updatedAt?: string
 }
 
 export interface Achievement {
@@ -66,11 +74,12 @@ export interface Achievement {
 
 export interface ActivityItem {
   id: string
-  title: string
-  timeAgo: string
+  type: string
+  label: string
   icon: string
-  tone: 'success' | 'info' | 'primary' | 'warning'
-  date: string
+  color: 'success' | 'info' | 'primary' | 'warning'
+  createdAt: string
+  timeAgo?: string
 }
 
 export interface ProfileSubscription {

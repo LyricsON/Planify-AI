@@ -6,7 +6,7 @@ const props = defineProps<{
 }>()
 
 const showAllActivityModal = ref(false)
-const MAX_ITEMS = 4
+const MAX_ITEMS = 6
 
 const visibleActivity = computed(() => {
   return props.activity.slice(0, MAX_ITEMS)
@@ -50,10 +50,10 @@ const toneClass = {
         <div class="flex min-w-0 items-center gap-2.5">
           <UIcon
             :name="item.icon"
-            :class="['size-4 shrink-0', toneClass[item.tone]]"
+            :class="['size-4 shrink-0', toneClass[item.color]]"
           />
           <p class="truncate text-sm font-medium text-[var(--color-text-soft)]">
-            {{ item.title }}
+            {{ item.label }}
           </p>
         </div>
         <span class="whitespace-nowrap text-sm font-medium text-[var(--color-text-muted)]">{{ item.timeAgo }}</span>
@@ -100,10 +100,10 @@ const toneClass = {
               <div class="flex min-w-0 items-center gap-2.5">
                 <UIcon
                   :name="item.icon"
-                  :class="['size-4 shrink-0', toneClass[item.tone]]"
+                  :class="['size-4 shrink-0', toneClass[item.color]]"
                 />
                 <p class="truncate text-sm font-medium text-[var(--color-text-soft)]">
-                  {{ item.title }}
+                  {{ item.label }}
                 </p>
               </div>
               <span class="whitespace-nowrap text-sm font-medium text-[var(--color-text-muted)]">{{ item.timeAgo }}</span>

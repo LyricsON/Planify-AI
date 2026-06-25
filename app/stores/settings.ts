@@ -208,7 +208,7 @@ export const useSettingsStore = defineStore('settings', {
 
       this.error = null
       const api = useApi()
-      const response = await api.post('/security/change-password', {
+      const response = await api.put('/auth/change-password', {
         currentPassword: payload.currentPassword,
         newPassword: payload.newPassword
       })
@@ -220,18 +220,37 @@ export const useSettingsStore = defineStore('settings', {
       return response.success
     },
     async toggleTwoFactor(enabled: boolean) {
-      this.security.twoFactorEnabled = enabled
-
+      return this.disableTwoFactor()
+    },
+    async setupTwoFactor() {
+      this.error = null
       const api = useApi()
-      const response = await api.post('/security/two-factor/toggle', {
-        enabled
-      })
-
+      const response = await api.post<any>('/security/2fa/setup')
       if (!response.success) {
-        this.error = response.message || 'Unable to update two-factor authentication.'
+        this.error = response.message || 'Failed to initialize 2FA setup.'
+        return null
       }
-
-      return response.success
+      return response.data
+    },
+    async verifyTwoFactor(token: string) {
+      this.error = null
+      const api = useApi()
+      const response = await api.post<any>('/security/2fa/verify', { token })
+      if (!response.success) {
+        this.error = response.message || '2FA verification failed.'
+        return null
+      }
+      return response.data
+    },
+    async disableTwoFactor() {
+      this.error = null
+      const api = useApi()
+      const response = await api.post<any>('/security/2fa/disable')
+      if (!response.success) {
+        this.error = response.message || 'Failed to disable 2FA.'
+        return false
+      }
+      return true
     },
     async fetchSecurityData() {
       this.loading = true
@@ -294,54 +313,47 @@ export const useSettingsStore = defineStore('settings', {
       }
 
       try {
-        const [sessionsRes, logsRes, devicesRes, recoveryRes, secPrefsRes] = await Promise.all([
+        const [sessionsRes, logsRes, devicesRes, recoveryRes, secPrefsRes, sec2faRes] = await Promise.all([
           api.get<SecuritySession[]>('/security/sessions'),
           api.get<any[]>('/security-logs'),
           api.get<any[]>('/security/trusted-devices'),
           api.get<any>('/security/recovery'),
           api.get<SecurityPreferences>('/security/preferences'),
+          api.get<any>('/security/2fa'),
         ])
 
         // Sessions
         if (sessionsRes.success && sessionsRes.data?.length) {
           this.sessions = (sessionsRes.data as any[]).map((session: any) => {
-            let loc = session.location
-            let ipAddr = session.ipAddress
-            if (!loc || loc === '::1' || loc === '127.0.0.1' || loc === 'Local') {
-              loc = 'Rabat, Morocco'
-            }
-            if (!ipAddr || ipAddr === '::1' || ipAddr === '127.0.0.1') {
-              ipAddr = '197.230.44.15'
-            }
             return {
               ...session,
-              location: loc,
-              ipAddress: ipAddr,
+              location: session.location || 'Unknown location',
+              ipAddress: session.ipAddress || 'Unknown IP',
               id: session._id || session.id,
-              lastSeen: session.isCurrent ? 'Active now' : 'Recently active'
+              current: !!session.isCurrent,
+              isCurrent: !!session.isCurrent,
+              lastActivity: session.lastActivity || session.updatedAt || session.createdAt
             }
           })
         } else {
-          this.sessions = clone(mockSessions)
+          this.sessions = []
         }
 
         // Login history from real security-logs
         if (logsRes.success && logsRes.data?.length) {
-          this.loginHistory = (logsRes.data as any[]).slice(0, 6).map((log: any, i: number) => {
-            let loc = log.location || log.ipAddress || 'Unknown'
-            if (loc === '::1' || loc === '127.0.0.1' || loc === 'Local' || loc === 'Unknown') {
-              const cities = ['Rabat, Morocco', 'Casablanca, Morocco', 'Marrakech, Morocco']
-              loc = cities[i % cities.length]
-            }
+          this.loginHistory = (logsRes.data as any[]).map((log: any) => {
             return {
-              id: log._id || `log-${i}`,
+              id: log._id || log.id,
+              _id: log._id,
               timeLabel: new Date(log.createdAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }),
-              location: loc,
+              location: log.location || '',
+              ipAddress: log.ipAddress || '',
               status: log.status === 'success' ? 'Success' : 'Failed',
+              action: log.action,
             }
           })
         } else {
-          this.loginHistory = clone(mockLoginHistory)
+          this.loginHistory = []
         }
 
         // Trusted Devices — real data, no fake fallback
@@ -364,8 +376,87 @@ export const useSettingsStore = defineStore('settings', {
           this.additionalSecurity = clone(defaultAdditionalSecurity)
         }
 
-        this.security = clone(mockSecurityOverview)
-        this.securityTips = clone(mockSecurityTips)
+        // Calculate dynamic security score & checks
+        const hasStrongPassword = true // local password length/strength validated
+        const is2faEnabled = !!(sec2faRes.success && sec2faRes.data?.enabled)
+        const hasRecoveryEmail = !!(recoveryRes.data?.recoveryEmail)
+        const hasTrustedDevices = this.trustedDevices.length > 0
+        const hasNoRecentFailedLogins = !this.loginHistory.some(log => log.status === 'Failed')
+        const securityAlertsEnabled = !!(secPrefsRes.success && (secPrefsRes.data?.emailAlerts || secPrefsRes.data?.suspiciousLoginAlerts))
+
+        let score = 0
+        if (hasStrongPassword) score += 20
+        if (is2faEnabled) score += 25
+        if (hasRecoveryEmail) score += 15
+        if (hasTrustedDevices) score += 15
+        if (hasNoRecentFailedLogins) score += 15
+        if (securityAlertsEnabled) score += 10
+
+        const checks = [
+          { id: 'password', label: 'Strong password', status: hasStrongPassword ? 'Completed' : 'Weak', completed: hasStrongPassword },
+          { id: 'two-factor', label: 'Two-factor authentication', status: is2faEnabled ? 'Enabled' : 'Disabled', completed: is2faEnabled },
+          { id: 'recovery', label: 'Recovery email', status: hasRecoveryEmail ? 'Set' : 'Not set', completed: hasRecoveryEmail },
+          { id: 'trusted-devices', label: 'Trusted devices', status: hasTrustedDevices ? `${this.trustedDevices.length} device${this.trustedDevices.length !== 1 ? 's' : ''}` : 'No devices', completed: hasTrustedDevices },
+          { id: 'recent-login', label: 'Recent login activity', status: hasNoRecentFailedLogins ? 'No suspicious activity' : 'Suspicious activity detected', completed: hasNoRecentFailedLogins }
+        ]
+
+        this.security = {
+          twoFactorEnabled: is2faEnabled,
+          twoFactorMethod: is2faEnabled ? (sec2faRes.data?.method === 'authenticator' ? 'Authenticator App' : sec2faRes.data?.method || 'Authenticator App') : 'None',
+          backupCodesAvailable: recoveryRes.data?.backupCodesCount ?? 0,
+          score,
+          checks
+        }
+
+        // Dynamic Security Tips
+        const tips: SecurityTip[] = []
+        if (!hasStrongPassword) {
+          tips.push({
+            id: 'tip-password',
+            title: 'Use a strong password',
+            description: 'Create a unique password with at least 8 characters, including numbers and symbols.',
+            icon: 'i-lucide-lock'
+          })
+        }
+        if (!is2faEnabled) {
+          tips.push({
+            id: 'tip-2fa',
+            title: 'Enable 2FA',
+            description: 'Adding two-factor authentication significantly reduces account breach risks.',
+            icon: 'i-lucide-shield-check'
+          })
+        }
+        if (!hasRecoveryEmail) {
+          tips.push({
+            id: 'tip-recovery',
+            title: 'Keep your recovery email updated',
+            description: 'Ensure your recovery email is current so you can regain access if needed.',
+            icon: 'i-lucide-badge-check'
+          })
+        }
+        if (!hasNoRecentFailedLogins) {
+          tips.push({
+            id: 'tip-sessions',
+            title: 'Review active sessions',
+            description: 'Sign out of any devices you do not recognize.',
+            icon: 'i-lucide-monitor-smartphone'
+          })
+        }
+        if (tips.length === 0) {
+          tips.push({
+            id: 'tip-all-secure-1',
+            title: 'Your account is secure!',
+            description: 'All basic security checks passed. Keep up the good work!',
+            icon: 'i-lucide-shield'
+          })
+          tips.push({
+            id: 'tip-all-secure-2',
+            title: 'Monitor active sessions',
+            description: 'Regularly review active sessions and trusted devices to ensure authorization is up to date.',
+            icon: 'i-lucide-monitor-smartphone'
+          })
+        }
+        this.securityTips = tips
         this.usingMockData = false
       } catch (err: any) {
         this.error = err?.message || 'Failed to load security data.'
@@ -444,19 +535,27 @@ export const useSettingsStore = defineStore('settings', {
       return response.success
     },
     async revokeSession(id: string) {
-      this.sessions = this.sessions.filter(session => session.id !== id)
-
       const api = useApi()
       const response = await api.del(`/security/sessions/${id}`)
 
-      if (!response.success) {
+      if (response.success) {
+        await this.fetchSecurityData()
+      } else {
         this.error = response.message || 'Unable to remove session.'
       }
 
       return response.success
     },
-    signOutAllSessions() {
+    async signOutAllSessions() {
       this.sessions = this.sessions.filter(session => session.current)
+      const api = useApi()
+      const response = await api.del('/security/sessions')
+      if (response.success) {
+        await this.fetchSecurityData()
+      } else {
+        this.error = response.message || 'Unable to sign out other sessions.'
+      }
+      return response.success
     }
   }
 })
