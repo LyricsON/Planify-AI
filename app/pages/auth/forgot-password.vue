@@ -23,7 +23,7 @@ const onSubmit = async () => {
   try {
     await sendPasswordReset(form.email.trim().toLowerCase())
 
-    await navigateTo(`/auth/verification?email=${encodeURIComponent(form.email.trim().toLowerCase())}`)
+    await navigateTo(`/auth/verification?email=${encodeURIComponent(form.email.trim().toLowerCase())}&purpose=reset`)
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : 'Unable to send reset instructions. Please try again.'
   } finally {

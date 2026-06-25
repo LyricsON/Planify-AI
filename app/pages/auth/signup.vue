@@ -23,6 +23,8 @@ const infoMessage = ref('')
 const passwordFocused = ref(false)
 const passwordInteracted = ref(false)
 const passwordWrapRef = ref<HTMLElement | null>(null)
+const roleMenuOpen = ref(false)
+const roleWrapRef = ref<HTMLElement | null>(null)
 
 const roleOptions = ['Student', 'Worker', 'Freelancer', 'Entrepreneur']
 
@@ -75,12 +77,23 @@ const handlePasswordFocusOut = (event: FocusEvent) => {
   passwordFocused.value = false
 }
 
+const closeRoleMenu = (event: MouseEvent | PointerEvent) => {
+  const target = event.target
+
+  if (!(target instanceof Node)) return
+  if (roleWrapRef.value?.contains(target)) return
+
+  roleMenuOpen.value = false
+}
+
 onMounted(() => {
   document.addEventListener('pointerdown', closePasswordDropdown)
+  document.addEventListener('pointerdown', closeRoleMenu)
 })
 
 onBeforeUnmount(() => {
   document.removeEventListener('pointerdown', closePasswordDropdown)
+  document.removeEventListener('pointerdown', closeRoleMenu)
 })
 
 const onGoogleClick = async () => {
@@ -273,25 +286,49 @@ const onSubmit = async () => {
 
       <label class="block space-y-2.5">
         <span class="signup-label">I'm a...</span>
-        <div class="signup-input">
+        <div
+          ref="roleWrapRef"
+          class="signup-input signup-select-wrap"
+        >
           <UIcon
             name="i-lucide-graduation-cap"
             class="signup-input-icon"
           />
-          <select
-            v-model="form.role"
-            class="signup-select"
+          <button
+            type="button"
+            class="signup-select-trigger"
+            :aria-expanded="roleMenuOpen"
+            aria-haspopup="listbox"
+            @click="roleMenuOpen = !roleMenuOpen"
           >
-            <option
-              v-for="option in roleOptions"
-              :key="option"
-              :value="option"
-            >{{ option }}</option>
-          </select>
-          <UIcon
-            name="i-lucide-chevron-down"
-            class="h-5 w-5 text-[var(--color-text-muted)]"
-          />
+            <span class="signup-select-value">{{ form.role }}</span>
+            <UIcon
+              name="i-lucide-chevron-down"
+              class="signup-select-chevron"
+            />
+          </button>
+
+          <Transition name="role-dropdown">
+            <div
+              v-if="roleMenuOpen"
+              class="signup-role-menu"
+              role="listbox"
+              aria-label="Select your role"
+            >
+              <button
+                v-for="option in roleOptions"
+                :key="option"
+                type="button"
+                class="signup-role-option"
+                :class="{ 'is-active': form.role === option }"
+                role="option"
+                :aria-selected="form.role === option"
+                @click="form.role = option; roleMenuOpen = false"
+              >
+                {{ option }}
+              </button>
+            </div>
+          </Transition>
         </div>
       </label>
 
@@ -447,8 +484,7 @@ const onSubmit = async () => {
   flex-shrink: 0;
 }
 
-.signup-input-control,
-.signup-select {
+.signup-input-control {
   width: 100%;
   height: 100%;
   border: 0;
@@ -461,6 +497,89 @@ const onSubmit = async () => {
 .signup-input-control::placeholder {
   color: #94a3b8;
   opacity: 0.85;
+}
+
+.signup-select-wrap {
+  position: relative;
+  overflow: visible;
+}
+
+.signup-select-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  background: transparent;
+  color: #0f172a;
+  cursor: pointer;
+  text-align: left;
+}
+
+.signup-select-value {
+  min-width: 0;
+  flex: 1;
+  font-size: 14px;
+  color: #0f172a;
+}
+
+.signup-select-chevron {
+  width: 18px;
+  height: 18px;
+  color: #94a3b8;
+  flex-shrink: 0;
+  pointer-events: none;
+}
+
+.signup-role-menu {
+  position: absolute;
+  left: -1px;
+  right: -1px;
+  top: calc(100% + 2px);
+  z-index: 40;
+  overflow: hidden;
+  border: 1px solid #cbd5e1;
+  border-radius: 0 0 10px 10px;
+  background: #ffffff;
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.14);
+}
+
+.signup-role-option {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  min-height: 36px;
+  padding: 8px 18px;
+  color: #0f172a;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.signup-role-option:hover,
+.signup-role-option.is-active {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.role-dropdown-enter-active,
+.role-dropdown-leave-active {
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.role-dropdown-enter-from,
+.role-dropdown-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
+}
+
+.role-dropdown-enter-to,
+.role-dropdown-leave-from {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .signup-icon-button {

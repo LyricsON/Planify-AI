@@ -1,6 +1,7 @@
 import { computed } from 'vue'
 import { getApp, getApps, initializeApp, type FirebaseApp } from 'firebase/app'
 import {
+  type ActionCodeSettings,
   browserLocalPersistence,
   browserSessionPersistence,
   createUserWithEmailAndPassword,
@@ -48,7 +49,7 @@ function getFirebaseConfig(): FirebasePublicConfig {
 
 function validateFirebaseConfig(config: FirebasePublicConfig) {
   const required = ['apiKey', 'authDomain', 'projectId', 'appId']
-  const missing = required.filter((key) => !config[key as keyof FirebasePublicConfig])
+  const missing = required.filter(key => !config[key as keyof FirebasePublicConfig])
 
   if (missing.length > 0) {
     throw new Error(`Firebase is not configured. Missing: ${missing.join(', ')}`)
@@ -93,6 +94,17 @@ function getGoogleProvider() {
   return googleProvider
 }
 
+function getActionCodeSettings(pathname: string): ActionCodeSettings {
+  if (!import.meta.client) {
+    throw new Error('Firebase auth is only available on the client')
+  }
+
+  return {
+    url: new URL(pathname, window.location.origin).toString(),
+    handleCodeInApp: true
+  }
+}
+
 function friendlyFirebaseError(error: unknown, fallback = 'Authentication failed. Please try again.') {
   const code = typeof error === 'object' && error && 'code' in error
     ? String((error as { code?: string }).code || '')
@@ -128,7 +140,7 @@ async function exchangeFirebaseSession(user: User) {
   const token = await user.getIdToken(true)
   const { post } = useApi()
 
-  const response = await post<{ token?: string; data?: unknown }>('/auth/firebase', {
+  const response = await post<{ token?: string, data?: unknown }>('/auth/firebase', {
     idToken: token
   })
 
@@ -173,7 +185,7 @@ export function useFirebaseAuth() {
       }
 
       try {
-        await sendEmailVerification(credentials.user)
+        await sendEmailVerification(credentials.user, getActionCodeSettings('/auth/signin'))
       } catch {
         // Verification email is best-effort; account creation still succeeds.
       }
@@ -198,9 +210,23 @@ export function useFirebaseAuth() {
   async function sendPasswordReset(email: string) {
     try {
       const auth = getFirebaseAuth()
-      await sendPasswordResetEmail(auth, email)
+      await sendPasswordResetEmail(auth, email, getActionCodeSettings('/auth/signin'))
     } catch (error) {
       throw new Error(friendlyFirebaseError(error, 'Unable to send reset instructions. Please try again.'))
+    }
+  }
+
+  async function resendEmailVerification() {
+    try {
+      const auth = getFirebaseAuth()
+
+      if (!auth.currentUser) {
+        throw new Error('Please sign in again to resend the verification email.')
+      }
+
+      await sendEmailVerification(auth.currentUser, getActionCodeSettings('/auth/signin'))
+    } catch (error) {
+      throw new Error(friendlyFirebaseError(error, 'Unable to resend the verification email. Please try again.'))
     }
   }
 
@@ -243,6 +269,7 @@ export function useFirebaseAuth() {
     signUpWithEmail,
     signInWithGoogle,
     sendPasswordReset,
+    resendEmailVerification,
     signOutFirebase
   }
 }
