@@ -853,20 +853,23 @@ async function quickStatus(task: Task, status: Task['status']) {
           </button>
         </div>
 
-        <div class="filter-actions">
-          <button class="filter-btn">
-            <UIcon name="i-lucide-sliders-horizontal" class="size-3.5" />
-            Filters
-          </button>
-          <div class="sort-wrap">
-            <span class="sort-label">Sort by:</span>
-            <select v-model="sortBy" class="sort-select">
-              <option value="priority">Priority</option>
-              <option value="deadline">Deadline</option>
-              <option value="newest">Newest</option>
-              <option value="oldest">Oldest</option>
-            </select>
+        <div class="filter-right">
+          <div class="filter-actions">
+            <button class="filter-btn">
+              <UIcon name="i-lucide-sliders-horizontal" class="size-3.5" />
+              Filters
+            </button>
+            <div class="sort-wrap">
+              <span class="sort-label">Sort by:</span>
+              <select v-model="sortBy" class="sort-select">
+                <option value="priority">Priority</option>
+                <option value="deadline">Deadline</option>
+                <option value="newest">Newest</option>
+                <option value="oldest">Oldest</option>
+              </select>
+            </div>
           </div>
+
           <div class="view-toggle">
             <button
               class="view-btn"
@@ -1415,7 +1418,7 @@ p, h1, h2, h3, h4, h5, h6 { margin: 0; }
   align-items: flex-start;
   justify-content: end;
   gap: 16px;
-  margin-bottom: 20px;
+  margin-bottom: 14px;
   flex-wrap: wrap;
 }
 
@@ -1549,8 +1552,8 @@ p, h1, h2, h3, h4, h5, h6 { margin: 0; }
 .stats-row {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 14px;
-  margin-bottom: 16px;
+  gap: 12px;
+  margin-bottom: 14px;
 }
 
 @media (max-width: 900px) {
@@ -1564,18 +1567,18 @@ p, h1, h2, h3, h4, h5, h6 { margin: 0; }
 .stat-card {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
-  padding: 16px;
+  gap: 10px;
+  padding: 14px;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-card);
-  min-height: 100px;
+  min-height: 92px;
 }
 
 .stat-icon-wrap {
-  width: 36px;
-  height: 36px;
+  width: 34px;
+  height: 34px;
   border-radius: var(--radius-lg);
   display: flex;
   align-items: center;
@@ -1586,22 +1589,22 @@ p, h1, h2, h3, h4, h5, h6 { margin: 0; }
 .stat-body { flex: 1; min-width: 0; }
 
 .stat-label {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--color-text-muted);
-  margin-bottom: 4px;
+  margin-bottom: 3px;
 }
 
 .stat-value {
-  font-size: 28px;
+  font-size: 25px;
   font-weight: 700;
   color: var(--color-text);
   line-height: 1;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 
 .stat-sub {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 500;
 }
 
@@ -1609,17 +1612,27 @@ p, h1, h2, h3, h4, h5, h6 { margin: 0; }
 .filter-bar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 16px;
+  justify-content: flex-start;
+  gap: 18px;
+  margin-bottom: 14px;
   flex-wrap: wrap;
 }
 
 .filter-tabs {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   flex-wrap: wrap;
+  min-width: 0;
+  flex: 0 0 auto;
+}
+
+.filter-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  flex: 0 0 auto;
 }
 
 .filter-tab {
@@ -1651,6 +1664,7 @@ p, h1, h2, h3, h4, h5, h6 { margin: 0; }
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .filter-btn {
@@ -1729,7 +1743,7 @@ p, h1, h2, h3, h4, h5, h6 { margin: 0; }
 .main-grid {
   display: grid;
   grid-template-columns: 1fr 300px;
-  gap: 18px;
+  gap: 14px;
   align-items: start;
 }
 
@@ -1737,13 +1751,13 @@ p, h1, h2, h3, h4, h5, h6 { margin: 0; }
   .main-grid { grid-template-columns: 1fr; }
 }
 
-.main-col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.main-col { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 
 /* ── Kanban Board ─────────────────────────────────────────────────────────── */
 .kanban-board {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 14px;
+  gap: 12px;
   min-width: 0;
 }
 
@@ -1762,7 +1776,7 @@ p, h1, h2, h3, h4, h5, h6 { margin: 0; }
   border: 1px solid var(--color-border);
   border-radius: var(--radius-xl);
   overflow: hidden;
-  min-height: 420px;
+  min-height: 404px;
   box-shadow: var(--shadow-card);
 }
 
@@ -1775,7 +1789,7 @@ p, h1, h2, h3, h4, h5, h6 { margin: 0; }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 12px 8px;
+  padding: 11px 12px 7px;
 }
 
 .kanban-col-title {
@@ -1796,9 +1810,9 @@ p, h1, h2, h3, h4, h5, h6 { margin: 0; }
   padding: 0 8px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 7px;
   overflow-y: auto;
-  max-height: 480px;
+  max-height: 468px;
   scrollbar-width: none;
 }
 
@@ -1821,7 +1835,7 @@ p, h1, h2, h3, h4, h5, h6 { margin: 0; }
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  padding: 10px;
+  padding: 9px;
   transition: box-shadow var(--transition-fast), transform var(--transition-fast);
   position: relative;
 }
@@ -1839,7 +1853,7 @@ p, h1, h2, h3, h4, h5, h6 { margin: 0; }
   display: flex;
   align-items: flex-start;
   gap: 6px;
-  margin-bottom: 4px;
+  margin-bottom: 3px;
 }
 
 .task-card-icon-wrap {
@@ -1849,7 +1863,7 @@ p, h1, h2, h3, h4, h5, h6 { margin: 0; }
 
 .task-card-title {
   flex: 1;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--color-text);
   line-height: 1.4;
@@ -1915,9 +1929,9 @@ p, h1, h2, h3, h4, h5, h6 { margin: 0; }
 .task-dropdown-item--danger:hover { background: color-mix(in srgb, var(--color-danger) 8%, transparent); }
 
 .task-card-course {
-  font-size: 11px;
+  font-size: 10px;
   color: var(--color-text-muted);
-  margin-bottom: 6px;
+  margin-bottom: 5px;
   padding-left: 22px;
 }
 
@@ -1926,7 +1940,7 @@ p, h1, h2, h3, h4, h5, h6 { margin: 0; }
   align-items: center;
   gap: 8px;
   padding-left: 22px;
-  margin-bottom: 6px;
+  margin-bottom: 5px;
   flex-wrap: wrap;
 }
 
@@ -1934,7 +1948,7 @@ p, h1, h2, h3, h4, h5, h6 { margin: 0; }
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 500;
 }
 
@@ -1986,8 +2000,8 @@ p, h1, h2, h3, h4, h5, h6 { margin: 0; }
   gap: 5px;
   width: calc(100% - 16px);
   margin: 8px;
-  height: 34px;
-  font-size: 12px;
+  height: 32px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--color-text-muted);
   background: transparent;
@@ -2007,11 +2021,11 @@ p, h1, h2, h3, h4, h5, h6 { margin: 0; }
 .list-view {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 7px;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-xl);
-  padding: 12px;
+  padding: 11px;
   box-shadow: var(--shadow-card);
 }
 
@@ -2020,7 +2034,7 @@ p, h1, h2, h3, h4, h5, h6 { margin: 0; }
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 10px 12px;
+  padding: 9px 11px;
   border-radius: var(--radius-lg);
   border: 1px solid var(--color-border);
   background: var(--color-surface);
@@ -2032,7 +2046,7 @@ p, h1, h2, h3, h4, h5, h6 { margin: 0; }
 .list-task-left { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; }
 
 .list-task-title { font-size: 13px; font-weight: 600; color: var(--color-text); }
-.list-task-course { font-size: 11px; color: var(--color-text-muted); }
+.list-task-course { font-size: 10px; color: var(--color-text-muted); }
 
 .list-task-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; flex-wrap: wrap; }
 
@@ -2063,7 +2077,7 @@ p, h1, h2, h3, h4, h5, h6 { margin: 0; }
 .bottom-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 16px;
+  gap: 14px;
 }
 
 @media (max-width: 800px) {
@@ -2075,7 +2089,7 @@ p, h1, h2, h3, h4, h5, h6 { margin: 0; }
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-xl);
-  padding: 16px;
+  padding: 14px;
   box-shadow: var(--shadow-card);
 }
 
@@ -2083,17 +2097,17 @@ p, h1, h2, h3, h4, h5, h6 { margin: 0; }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 
 .card-title {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
   color: var(--color-text);
 }
 
 .card-link {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--color-primary);
   background: none;
@@ -2106,17 +2120,17 @@ p, h1, h2, h3, h4, h5, h6 { margin: 0; }
 .card-link:hover { opacity: 0.7; }
 
 .card-subtitle {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--color-text-muted);
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 
 .card-footer-link {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  margin-top: 12px;
-  font-size: 12px;
+  margin-top: 10px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--color-primary);
   background: none;
@@ -2134,9 +2148,9 @@ p, h1, h2, h3, h4, h5, h6 { margin: 0; }
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 20px 12px;
+  padding: 18px 12px;
   color: var(--color-text-muted);
-  font-size: 12px;
+  font-size: 11px;
   text-align: center;
 }
 
