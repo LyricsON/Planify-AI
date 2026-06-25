@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import AppSidebar from './AppSidebar.vue'
 import AppTopbar from './AppTopbar.vue'
+
+const dashboard = useDashboardSummary()
+
+onMounted(() => {
+  void dashboard.ensureLoaded()
+})
 </script>
 
 <template>

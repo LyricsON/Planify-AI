@@ -1,14 +1,17 @@
 <script setup lang="ts">
-const { get } = useApi()
-const user = ref<any>(null)
+const dashboard = useDashboardSummary()
 const route = useRoute()
 
 const greeting = computed(() => {
-  const hour = new Date().getHours()
-  if (hour < 12) return 'Good morning'
-  if (hour < 18) return 'Good afternoon'
-  return 'Good evening'
+  return dashboard.summary.value?.greeting || (() => {
+    const hour = new Date().getHours()
+    if (hour < 12) return 'Good morning'
+    if (hour < 18) return 'Good afternoon'
+    return 'Good evening'
+  })()
 })
+
+const notificationCount = computed(() => dashboard.summary.value?.counts.notificationsUnread ?? 0)
 
 const pageHeaders: Record<string, { title: string; subtitle: string; icon?: string; iconClass?: string }> = {
   '/dashboard/schedule': {
@@ -97,78 +100,81 @@ const currentHeader = computed(() => {
       iconClass: 'tasks-icon-container',
     }
   }
+
   return pageHeaders[route.path] ?? null
 })
 
 onMounted(async () => {
-  try {
-    const res = await get<any>('/auth/me')
-    if (res.success && res.data) user.value = res.data
-  } catch {}
+  await dashboard.ensureLoaded()
 })
 </script>
 
 <template>
-  <header class="sticky top-0 z-30 bg-slate-50 dark:bg-slate-950 px-5 pt-3 pb-6">
+  <header class="sticky top-0 z-30 bg-slate-50 px-5 pb-6 pt-3 dark:bg-slate-950">
     <div class="flex items-center justify-between gap-4">
-      <!-- Left: Dynamic page header or greeting -->
       <div>
         <template v-if="currentHeader">
           <div>
             <div class="flex items-center gap-2">
-              <div v-if="currentHeader.icon" :class="currentHeader.iconClass || 'default-icon-container'">
-                <UIcon :name="currentHeader.icon" class="size-5" />
+              <div
+                v-if="currentHeader.icon"
+                :class="currentHeader.iconClass || 'default-icon-container'"
+              >
+                <UIcon
+                  :name="currentHeader.icon"
+                  class="size-5"
+                />
               </div>
-              <h1 class="text-[24px] font-bold text-slate-900 dark:text-white leading-tight">
+              <h1 class="text-[24px] font-bold leading-tight text-slate-900 dark:text-white">
                 {{ currentHeader.title }}
               </h1>
             </div>
-            <p class="topbar-subtitle mb-0 text-[14px] text-slate-500 dark:text-slate-400 font-medium mt-1.5">
+            <p class="topbar-subtitle mb-0 mt-1.5 text-[14px] font-medium text-slate-500 dark:text-slate-400">
               {{ currentHeader.subtitle }}
             </p>
           </div>
         </template>
         <template v-else>
-          <h1 class="text-[24px] font-bold text-slate-900 dark:text-white leading-tight">
-            {{ greeting }}, {{ user?.name?.split(' ')[0] || 'User' }}! 👋
+          <h1 class="text-[24px] font-bold leading-tight text-slate-900 dark:text-white">
+            {{ greeting }}, {{ dashboard.summary.value?.user.firstName || 'User' }}! 👋
           </h1>
-          <p class="topbar-subtitle mb-0 text-[14px] text-slate-500 dark:text-slate-400 font-medium mt-0.5">
+          <p class="topbar-subtitle mb-0 mt-0.5 text-[14px] font-medium text-slate-500 dark:text-slate-400">
             Let's make today productive and focused.
           </p>
         </template>
       </div>
 
-      <!-- Right: Search + Actions -->
       <div class="flex items-center gap-3">
-        <!-- Search -->
-        <div class="relative">
+        <div class="relative hidden sm:block">
           <UIcon
             name="i-lucide-search"
-            class="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-slate-400 pointer-events-none"
+            class="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400"
           />
           <input
             placeholder="Search anything..."
-            class="h-[38px] w-[240px] bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-[10px] pl-9 pr-4 text-[13px] font-medium text-slate-700 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none focus:border-indigo-400 transition"
+            class="h-[38px] w-[240px] rounded-[10px] border border-slate-200 bg-slate-50 pl-9 pr-4 text-[13px] font-medium text-slate-700 transition placeholder:text-slate-400 focus:border-indigo-400 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
           >
         </div>
 
-        <!-- Notifications -->
-        <button class="relative size-[38px] flex items-center justify-center rounded-[10px] border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 transition">
+        <button class="relative flex size-[38px] items-center justify-center rounded-[10px] border border-slate-200 bg-white transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700">
           <UIcon
             name="i-lucide-bell"
             class="size-4 text-slate-600 dark:text-slate-300"
           />
-          <span class="absolute top-1.5 right-1.5 size-[7px] rounded-full bg-indigo-500" />
+          <span
+            v-if="notificationCount > 0"
+            class="absolute right-1.5 top-1.5 min-w-[16px] rounded-full bg-indigo-500 px-1 text-[10px] font-bold leading-4 text-white"
+          >
+            {{ notificationCount }}
+          </span>
         </button>
 
-        <!-- Calendar -->
-        <button class="size-[38px] flex items-center justify-center rounded-[10px] border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 transition">
+        <button class="flex size-[38px] items-center justify-center rounded-[10px] border border-slate-200 bg-white transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700">
           <UIcon
             name="i-lucide-calendar-days"
             class="size-4 text-slate-600 dark:text-slate-300"
           />
         </button>
-
       </div>
     </div>
   </header>
@@ -202,45 +208,48 @@ onMounted(async () => {
 }
 
 .schedule-icon-container {
-  background: rgba(14, 165, 233, 0.12); /* sky soft */
-  color: #0ea5e9; /* sky */
+  background: rgba(14, 165, 233, 0.12);
+  color: #0ea5e9;
 }
+
 .dark .schedule-icon-container {
   background: rgba(56, 189, 248, 0.15);
   color: #38bdf8;
 }
 
 .courses-icon-container {
-  background: rgba(16, 185, 129, 0.12); /* success/emerald soft */
-  color: #10b981; /* success/emerald */
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
 }
 
 .files-icon-container {
-  background: rgba(244, 63, 94, 0.12); /* danger/rose soft */
-  color: #f43f5e; /* danger/rose */
+  background: rgba(244, 63, 94, 0.12);
+  color: #f43f5e;
 }
 
 .tasks-icon-container {
-  background: rgba(139, 92, 246, 0.12); /* violet/ai soft */
-  color: #8b5cf6; /* violet/ai */
+  background: rgba(139, 92, 246, 0.12);
+  color: #8b5cf6;
 }
+
 .dark .tasks-icon-container {
   background: rgba(167, 139, 250, 0.15);
   color: #a78bfa;
 }
 
 .exams-icon-container {
-  background: rgba(245, 158, 11, 0.12); /* warning/amber soft */
-  color: #f59e0b; /* warning/amber */
+  background: rgba(245, 158, 11, 0.12);
+  color: #f59e0b;
 }
+
 .dark .exams-icon-container {
   background: rgba(251, 191, 36, 0.15);
   color: #fbbf24;
 }
 
 .analytics-icon-container {
-  background: rgba(59, 130, 246, 0.12); /* info/blue soft */
-  color: #3b82f6; /* info/blue */
+  background: rgba(59, 130, 246, 0.12);
+  color: #3b82f6;
 }
 
 .default-icon-container {

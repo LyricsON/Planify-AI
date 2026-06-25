@@ -1,28 +1,14 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { storeToRefs } from 'pinia'
 
-const { get } = useApi()
+const dashboard = useDashboardSummary()
 const route = useRoute()
 const router = useRouter()
 
-// Use profile store for reactive user data (avatar updates everywhere after profile edits)
-const profileStore = useProfileStore()
-const { user: profileUser } = storeToRefs(profileStore)
-
-// Fallback local user ref for sidebar-specific data not yet loaded into profile store
-const localUser = ref<any>(null)
-const tokenBalance = ref<number | null>(null)
-const plan = ref<any>(null)
-
-// Computed: prefer profile store user (reactive), fall back to local fetch
-const user = computed(() => profileUser.value || localUser.value)
-
-function toNumber(value: unknown): number | null {
-  const n = Number(value)
-  return Number.isFinite(n) ? n : null
-}
+const user = computed(() => dashboard.summary.value?.user ?? null)
+const tokenBalance = computed(() => dashboard.summary.value?.user.tokenBalance ?? null)
+const planLabel = computed(() => dashboard.summary.value?.user.planLabel ?? 'Free Plan')
 
 const navItems = [
   { label: 'Home', icon: 'i-lucide-home', to: '/dashboard' },
@@ -36,8 +22,9 @@ const navItems = [
 ]
 
 const isRouteActive = (path: string) => {
-  const [basePath, query] = path.split('?')
-  const q = new URLSearchParams(query || '')
+  const [rawBasePath, rawQuery] = path.split('?')
+  const basePath = rawBasePath || ''
+  const q = new URLSearchParams(rawQuery || '')
   const targetTab = q.get('tab')
 
   if (path === '/dashboard') {
@@ -110,44 +97,18 @@ function handleEscape(event: KeyboardEvent) {
 onMounted(() => {
   document.addEventListener('click', handleClickOutside)
   document.addEventListener('keydown', handleEscape)
+  void dashboard.ensureLoaded()
 })
 
 onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside)
   document.removeEventListener('keydown', handleEscape)
 })
-
-onMounted(async () => {
-  try {
-    const [meRes, tokenRes, subRes] = await Promise.all([
-      get<any>('/auth/me'),
-      get<any>('/tokens/balance'),
-      get<any>('/subscriptions/me')
-    ])
-
-    const meData = meRes.success ? (meRes.data as any) : null
-    const subData = subRes.success ? (subRes.data as any) : null
-    const tokenData = tokenRes.success ? (tokenRes.data as any) : null
-
-    localUser.value = meData?.user || meData?.data || meData || null
-
-    tokenBalance.value = toNumber(
-      tokenData?.tokenBalance
-      ?? tokenData?.balance
-      ?? tokenData?.available
-      ?? tokenData?.tokens
-    )
-
-    plan.value = subData?.planName || subData?.plan || subData?.name || 'Free'
-  } catch (err) {
-    console.error('Sidebar fetch error', err)
-  }
-})
 </script>
 
 <template>
-  <aside class="fixed left-0 top-0 z-40 h-screen w-[260px] border-r border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-y-auto sidebar-scroll">
-    <div class="px-4 py-8 flex flex-col min-h-full">
+  <aside class="sidebar-scroll fixed left-0 top-0 z-40 h-screen w-[260px] overflow-y-auto border-r border-slate-100 bg-white dark:border-slate-800 dark:bg-slate-900">
+    <div class="flex min-h-full flex-col px-4 py-8">
       <NuxtLink
         to="/dashboard"
         class="mb-10 flex flex-shrink-0 items-center gap-3"
@@ -158,18 +119,18 @@ onMounted(async () => {
             class="size-5 fill-white/20"
           />
         </div>
-        <span class="text-[24px] font-bold text-[#312e81] dark:text-indigo-400 tracking-tight">
+        <span class="text-[24px] font-bold tracking-tight text-[#312e81] dark:text-indigo-400">
           Planify AI
         </span>
       </NuxtLink>
 
-      <nav class="space-y-1.5 flex-1">
+      <nav class="flex-1 space-y-1.5">
         <NuxtLink
           v-for="item in navItems"
           :key="item.to"
           :to="item.to"
-          class="relative flex items-center gap-2 rounded-[12px] px-2 py-3 text-[13px] font-semibold transition text-slate-800"
-          :class="isRouteActive(item.to) ? 'bg-[#f5f4fd] text-[#534bfa] dark:bg-indigo-900/40 dark:text-indigo-400' : 'text-slate-800 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-[#534bfa] dark:hover:text-slate-200'"
+          class="relative flex items-center gap-2 rounded-[12px] px-2 py-3 text-[13px] font-semibold transition"
+          :class="isRouteActive(item.to) ? 'bg-[#f5f4fd] text-[#534bfa] dark:bg-indigo-900/40 dark:text-indigo-400' : 'text-slate-800 hover:bg-slate-50 hover:text-[#534bfa] dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200'"
         >
           <div
             v-if="isRouteActive(item.to)"
@@ -185,13 +146,10 @@ onMounted(async () => {
       </nav>
 
       <div class="mt-8 flex-shrink-0 space-y-6">
-        <!-- Upgrade Plan Card -->
-        <div class="rounded-[14px] bg-gradient-to-br from-[#4f46e5] via-[#6366f1] to-[#7c3aed] p-5 text-white relative overflow-hidden flex flex-col items-start shadow-sm">
-          <!-- Decorative Stars -->
-          <div class="absolute right-6 top-[35%] -translate-y-1/2 flex items-center justify-center opacity-90 pointer-events-none">
-            <!-- Small Blue Star -->
+        <div class="relative overflow-hidden rounded-[14px] bg-gradient-to-br from-[#4f46e5] via-[#6366f1] to-[#7c3aed] p-5 text-white shadow-sm">
+          <div class="pointer-events-none absolute right-6 top-[35%] -translate-y-1/2 flex items-center justify-center opacity-90">
             <svg
-              class="absolute -left-3 top-5 w-[16px] h-[16px]"
+              class="absolute -left-3 top-5 h-[16px] w-[16px]"
               viewBox="0 0 24 24"
               fill="none"
               xmlns="http://www.w3.org/2000/svg"
@@ -219,9 +177,8 @@ onMounted(async () => {
                 fill="url(#grad-blue)"
               />
             </svg>
-            <!-- Large Orange/Pink Star -->
             <svg
-              class="w-[36px] h-[36px]"
+              class="h-[36px] w-[36px]"
               viewBox="0 0 24 24"
               fill="none"
               xmlns="http://www.w3.org/2000/svg"
@@ -251,26 +208,23 @@ onMounted(async () => {
             </svg>
           </div>
 
-          <p class="plan-card text-[13px] font-semibold relative z-10 !text-white tracking-wide">
+          <p class="plan-card relative z-10 text-[13px] font-semibold tracking-wide !text-white">
             Upgrade your plan
           </p>
-          <p class="plan-card text-[11px] leading-[1.6] !text-white opacity-80 pr-12 relative z-10 font-medium">
+          <p class="plan-card relative z-10 pr-12 text-[11px] font-medium leading-[1.6] !text-white opacity-80">
             Unlock unlimited AI features and more productivity.
           </p>
-          <button
-            class="mt-2 text-[12px] text-[#534bfa] font-bold bg-white hover:bg-slate-50 rounded-[8px] px-4 py-1.5 relative z-10 transition-colors"
-          >
+          <button class="relative z-10 mt-2 rounded-[8px] bg-white px-4 py-1.5 text-[12px] font-bold text-[#534bfa] transition-colors hover:bg-slate-50">
             Upgrade Now
           </button>
         </div>
 
-        <!-- Tokens Card -->
-        <div class="rounded-[16px] border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-[0_2px_8px_-4px_rgba(0,0,0,0.05)]">
+        <div class="rounded-[16px] border border-slate-100 bg-white p-5 shadow-[0_2px_8px_-4px_rgba(0,0,0,0.05)] dark:border-slate-800 dark:bg-slate-900">
           <p class="text-[12px] font-bold text-slate-800 dark:text-slate-200">
             Your Tokens
           </p>
           <div class="mt-3 flex items-center gap-2.5">
-            <div class="size-[24px] flex items-center justify-center rounded-full bg-[#fbbf24] shadow-sm shadow-amber-200 dark:shadow-none">
+            <div class="flex size-[24px] items-center justify-center rounded-full bg-[#fbbf24] shadow-sm shadow-amber-200 dark:shadow-none">
               <UIcon
                 name="i-lucide-database"
                 class="size-3.5 text-white"
@@ -278,8 +232,10 @@ onMounted(async () => {
             </div>
             <span
               v-if="tokenBalance !== null"
-              class="text-[24px] font-bold text-slate-900 dark:text-white leading-none"
-            >{{ tokenBalance.toLocaleString() }}</span>
+              class="text-[24px] font-bold leading-none text-slate-900 dark:text-white"
+            >
+              {{ tokenBalance.toLocaleString() }}
+            </span>
             <UIcon
               v-else
               name="i-lucide-loader-2"
@@ -288,7 +244,7 @@ onMounted(async () => {
           </div>
           <NuxtLink
             to="/settings/billing"
-            class="mt-4 inline-flex items-center gap-1.5 text-[12px] font-bold text-[#4338ca] dark:text-indigo-400 hover:text-indigo-700 transition"
+            class="mt-4 inline-flex items-center gap-1.5 text-[12px] font-bold text-[#4338ca] transition hover:text-indigo-700 dark:text-indigo-400"
           >
             Buy Tokens
             <UIcon
@@ -298,21 +254,19 @@ onMounted(async () => {
           </NuxtLink>
         </div>
 
-        <!-- Profile Card & Custom Dropdown -->
         <div class="relative w-full">
-          <!-- Dropdown Panel -->
           <div
             v-if="isOpen"
             ref="dropdownRef"
-            class="absolute bottom-[calc(100%+8px)] left-0 right-0 z-50 bg-white dark:bg-slate-950 border border-slate-100 dark:border-slate-800 rounded-[14px] shadow-[0_4px_16px_rgba(15,23,42,0.08)] p-1.5 flex flex-col gap-0.5"
+            class="absolute bottom-[calc(100%+8px)] left-0 right-0 z-50 flex flex-col gap-0.5 rounded-[14px] border border-slate-100 bg-white p-1.5 shadow-[0_4px_16px_rgba(15,23,42,0.08)] dark:border-slate-800 dark:bg-slate-950"
             role="menu"
             aria-label="User profile menu"
           >
             <button
               v-for="item in menuItems"
               :key="item.label"
-              class="flex items-center gap-2.5 px-3 rounded-[10px] text-[13px] font-semibold text-slate-700 dark:text-slate-350 hover:bg-[#f5f4fd] dark:hover:bg-indigo-950/30 hover:text-[#534bfa] dark:hover:text-indigo-400 transition-colors w-full text-left h-[38px] focus:outline-none"
-              :class="{ 'text-rose-600 dark:text-rose-450 hover:bg-rose-50 dark:hover:bg-rose-950/20 hover:text-rose-600 dark:hover:text-rose-400': item.label === 'Sign out' }"
+              class="flex h-[38px] w-full items-center gap-2.5 rounded-[10px] px-3 text-left text-[13px] font-semibold text-slate-700 transition-colors hover:bg-[#f5f4fd] hover:text-[#534bfa] dark:text-slate-350 dark:hover:bg-indigo-950/30 dark:hover:text-indigo-400"
+              :class="{ 'text-rose-600 hover:bg-rose-50 hover:text-rose-600 dark:text-rose-450 dark:hover:bg-rose-950/20 dark:hover:text-rose-400': item.label === 'Sign out' }"
               role="menuitem"
               @click="item.click"
             >
@@ -325,33 +279,32 @@ onMounted(async () => {
             </button>
           </div>
 
-          <!-- Profile Card -->
           <div
+            class="flex cursor-pointer items-center gap-3 rounded-[16px] border border-slate-100 bg-white p-3 shadow-[0_2px_8px_-4px_rgba(0,0,0,0.05)] transition hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
             @click="router.push('/settings/profile')"
-            class="flex items-center gap-3 rounded-[16px] border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-3 hover:bg-slate-50 dark:hover:bg-slate-800 transition cursor-pointer shadow-[0_2px_8px_-4px_rgba(0,0,0,0.05)]"
           >
             <AppAvatar
-              :src="user?.avatar"
+              :src="user?.avatar || undefined"
               :name="user?.name"
               size="sm"
             />
 
             <div class="min-w-0 flex-1 pl-1">
-              <p class="truncate text-[13px] font-bold text-[#312e81] dark:text-white leading-tight">
+              <p class="truncate text-[13px] font-bold leading-tight text-[#312e81] dark:text-white">
                 {{ user ? user.name : 'Loading...' }}
               </p>
-              <p class="text-[11px] font-bold text-slate-500 dark:text-slate-400 capitalize truncate mt-0.5">
-                {{ plan ? `${plan} Plan` : 'Free Plan' }}
+              <p class="mt-0.5 truncate text-[11px] font-bold capitalize text-slate-500 dark:text-slate-400">
+                {{ planLabel }}
               </p>
             </div>
 
             <button
               ref="chevronButtonRef"
-              @click.stop="isOpen = !isOpen"
-              class="size-6 flex items-center justify-center rounded-full bg-slate-50 dark:bg-slate-800 text-slate-400 hover:text-slate-650 dark:hover:text-slate-200 transition-colors focus:outline-none"
-              aria-expanded="isOpen"
+              class="flex size-6 items-center justify-center rounded-full bg-slate-50 text-slate-400 transition-colors hover:text-slate-650 focus:outline-none dark:bg-slate-800 dark:hover:text-slate-200"
+              :aria-expanded="isOpen"
               aria-haspopup="menu"
               aria-label="Toggle user profile menu"
+              @click.stop="isOpen = !isOpen"
             >
               <UIcon
                 name="i-lucide-chevron-up"
@@ -370,6 +323,7 @@ onMounted(async () => {
 p {
   margin: 0;
 }
+
 .plan-card {
   margin-bottom: 6px;
 }
