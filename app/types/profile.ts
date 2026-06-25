@@ -18,8 +18,15 @@ export interface AcademicInformation {
   university?: string
   fieldOfStudy?: string
   academicYear?: string
+  semester?: string
   studentId?: string
   gpa?: string
+}
+
+export interface SocialLinks {
+  website?: string
+  linkedin?: string
+  github?: string
 }
 
 export interface ProfileDetails {
@@ -28,6 +35,7 @@ export interface ProfileDetails {
   completion: number
   tags: string[]
   academic: AcademicInformation
+  socialLinks?: SocialLinks
   checklist: ProfileChecklistItem[]
 }
 
@@ -93,19 +101,27 @@ export interface QuickAction {
   label: string
   description?: string
   icon: string
-  to: string
+  to?: string
+  action?: 'edit-profile' | 'download-data'
 }
 
+/**
+ * Payload for updating user profile.
+ * - email is intentionally excluded: email changes require a dedicated secure flow.
+ * - plan is intentionally excluded: plan changes are handled by the billing system only.
+ */
 export interface ProfilePayload {
+  avatar?: string
   name: string
-  email: string
   phone: string
   location: string
   bio: string
   university: string
   fieldOfStudy: string
   academicYear: string
+  semester: string
   studentId: string
+  socialLinks?: SocialLinks
 }
 
 export interface Task {

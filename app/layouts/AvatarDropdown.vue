@@ -1,5 +1,9 @@
 <script setup lang="ts">
+import { storeToRefs } from 'pinia'
 const { logout } = useAuth()
+
+const profileStore = useProfileStore()
+const { user } = storeToRefs(profileStore)
 
 const items = [
   [
@@ -35,7 +39,9 @@ const items = [
 <template>
   <UDropdownMenu :items="items">
     <button class="flex items-center gap-2 rounded-full border border-slate-200 bg-white p-1 pr-2 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700">
-      <UAvatar
+      <AppAvatar
+        :src="user?.avatar"
+        :name="user?.name"
         size="sm"
       />
 

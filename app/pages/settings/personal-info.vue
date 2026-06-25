@@ -95,18 +95,15 @@ function formatDate(value?: string) {
       {{ feedback.text }}
     </div>
 
+    <!-- Loading Spinner -->
     <div
-      v-if="loading"
-      class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]"
+      v-if="loading || (!user && !error)"
+      class="flex items-center justify-center py-20"
     >
-      <div class="space-y-6">
-        <div class="h-96 animate-pulse rounded-[var(--radius-2xl)] bg-[var(--color-bg-soft)]" />
-        <div class="h-72 animate-pulse rounded-[var(--radius-2xl)] bg-[var(--color-bg-soft)]" />
-      </div>
-      <div class="space-y-6">
-        <div class="h-80 animate-pulse rounded-[var(--radius-2xl)] bg-[var(--color-bg-soft)]" />
-        <div class="h-80 animate-pulse rounded-[var(--radius-2xl)] bg-[var(--color-bg-soft)]" />
-      </div>
+      <UIcon
+        name="i-lucide-loader-2"
+        class="size-8 animate-spin text-indigo-600"
+      />
     </div>
 
     <div
@@ -121,10 +118,11 @@ function formatDate(value?: string) {
           <div class="grid gap-4 md:grid-cols-[128px_minmax(0,1fr)]">
             <div class="space-y-3">
               <div class="relative">
-                <UAvatar
+                <AppAvatar
                   :src="user.avatar"
-                  :alt="user.name"
-                  class="size-28 ring-4 ring-[var(--color-primary-soft)]"
+                  :name="user.name"
+                  size="xl"
+                  class="ring-4 ring-[var(--color-primary-soft)]"
                 />
                 <button
                   type="button"
@@ -225,7 +223,10 @@ function formatDate(value?: string) {
             <p class="mt-3 text-2xl font-semibold text-[var(--color-text)]">
               {{ subscription?.name || 'Free Plan' }}
             </p>
-            <p class="mt-1 text-sm text-muted">
+            <p
+              v-if="subscription?.name && !subscription.name.toLowerCase().includes('free') && subscription.nextBillingDate"
+              class="mt-1 text-sm text-muted"
+            >
               Next billing date: {{ formatDate(subscription?.nextBillingDate) }}
             </p>
             <NuxtLink

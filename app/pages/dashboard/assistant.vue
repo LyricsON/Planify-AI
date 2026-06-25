@@ -796,11 +796,11 @@ onMounted(() => {
                     {{ msg.text }}
                   </div>
                 </div>
-                <UAvatar
-                  :src="currentUser?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser?.name || '')}&background=random`"
-                  alt="User Avatar"
+                <AppAvatar
+                  :src="currentUser?.avatar"
+                  :name="currentUser?.name"
                   size="sm"
-                  class="rounded-full flex-shrink-0 size-[32px] border border-slate-100 dark:border-slate-800"
+                  class="flex-shrink-0 border border-slate-100 dark:border-slate-800"
                 />
               </div>
 

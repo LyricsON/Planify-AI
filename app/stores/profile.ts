@@ -62,11 +62,43 @@ function normalizeStatus(value?: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase()
 }
 
+/**
+ * Normalize an avatar URL/path to an absolute URL the browser can load.
+ * - Full https:// or http:// URLs are returned as-is (Google photoURL, external CDN).
+ * - Relative paths like /uploads/file.jpg are prefixed with the backend origin.
+ * - Empty/null values return undefined.
+ */
+function normalizeAvatarUrl(raw?: string | null): string | undefined {
+  if (!raw || !raw.trim()) return undefined
+  if (raw.startsWith('http')) return raw
+
+  let apiBase = 'http://localhost:5000/api'
+  try {
+    const config = useRuntimeConfig()
+    if (config?.public?.apiBase) {
+      apiBase = config.public.apiBase
+    } else if (import.meta.client) {
+      apiBase = (window as any).__NUXT__?.config?.public?.apiBase || apiBase
+    }
+  } catch {
+    if (import.meta.client) {
+      apiBase = (window as any).__NUXT__?.config?.public?.apiBase || apiBase
+    }
+  }
+
+  try {
+    const origin = new URL(apiBase).origin
+    return `${origin}${raw.startsWith('/') ? raw : `/${raw}`}`
+  } catch {
+    return raw
+  }
+}
+
 const quickActions: QuickAction[] = [
-  { id: 'edit-profile', label: 'Edit Profile', icon: 'i-lucide-user-round-pen', to: '/settings/personal-info' },
+  { id: 'edit-profile', label: 'Edit Profile', icon: 'i-lucide-user-round-pen', action: 'edit-profile' },
   { id: 'manage-plan', label: 'Manage Plan', icon: 'i-lucide-credit-card', to: '/settings/billing' },
   { id: 'billing-history', label: 'Billing History', icon: 'i-lucide-receipt', to: '/settings/billing' },
-  { id: 'download-data', label: 'Download My Data', icon: 'i-lucide-download', to: '/settings/security' },
+  { id: 'download-data', label: 'Download My Data', icon: 'i-lucide-download', action: 'download-data' },
   { id: 'account-settings', label: 'Account Settings', icon: 'i-lucide-settings-2', to: '/settings/security' }
 ]
 
@@ -252,16 +284,16 @@ export const useProfileStore = defineStore('profile', {
         const completion = Math.round((checklist.filter((item) => item.completed).length / checklist.length) * 100)
 
         const tokenLimit = Number(tokenData.limit || tokenData.monthlyLimit || subscriptionData.tokenAllowance || 0) || undefined
-        const tokenBalance = Number(tokenData.balance || tokenData.tokens || tokenData.available || 0)
+        const tokenBalance = Number(tokenData.balance || tokenData.tokens || tokenData.available || tokenData.tokenBalance || 0)
         const tokenUsed = Number(tokenData.used || (tokenLimit ? Math.max(0, tokenLimit - tokenBalance) : 0))
 
         this.user = {
           id: String(userData.id || userData._id || 'user'),
           name: String(userData.name || userData.fullName || 'User'),
           email: String(userData.email || 'Not added yet'),
-          avatar: userData.avatar || userData.profileImage,
-          phone: userData.phone,
-          location: userData.location,
+          avatar: normalizeAvatarUrl(userData.avatar || userData.profileImage),
+          phone: userData.phone || profileData.phone,
+          location: userData.location || profileData.location,
           role: userData.role || subscriptionData.role || 'Student'
         }
 
@@ -274,9 +306,11 @@ export const useProfileStore = defineStore('profile', {
             university: profileData.university || profileData.academic?.university,
             fieldOfStudy: profileData.program || profileData.fieldOfStudy || profileData.academic?.fieldOfStudy || profileData.academic?.program,
             academicYear: profileData.academicYear || profileData.academic?.academicYear || profileData.year,
+            semester: profileData.semester || profileData.academic?.semester,
             studentId: profileData.studentId || profileData.academic?.studentId,
             gpa: profileData.gpa || profileData.academic?.gpa
           },
+          socialLinks: profileData.socialLinks || undefined,
           checklist
         }
 
@@ -331,7 +365,7 @@ export const useProfileStore = defineStore('profile', {
           limit: tokenLimit,
           used: tokenUsed,
           usedPercentage: tokenLimit ? Math.min(100, Math.round((tokenUsed / tokenLimit) * 100)) : undefined,
-          resetDate: tokenData.resetDate || tokenData.nextResetDate || tokenHistoryRes.data?.resetDate
+          resetDate: tokenData.resetDate || tokenData.nextResetDate || (tokenHistoryRes.data as any)?.resetDate
         }
 
         this.aiPreferences = [
@@ -368,16 +402,26 @@ export const useProfileStore = defineStore('profile', {
         this.loading = false
       }
     },
+
     async updateProfile(payload: ProfilePayload) {
       const api = useApi()
       const requests = await Promise.all([
-        api.put('/users/me', payload),
+        // PUT /api/users/me — safe fields only (name, phone, location, avatar)
+        api.put('/users/me', {
+          name: payload.name,
+          phone: payload.phone,
+          location: payload.location,
+          avatar: payload.avatar
+        }),
+        // PUT /api/profile/me — profile-specific fields
         api.put('/profile/me', {
           bio: payload.bio,
           university: payload.university,
           fieldOfStudy: payload.fieldOfStudy,
           academicYear: payload.academicYear,
-          studentId: payload.studentId
+          semester: payload.semester,
+          studentId: payload.studentId,
+          socialLinks: payload.socialLinks
         })
       ])
 
@@ -386,17 +430,17 @@ export const useProfileStore = defineStore('profile', {
         this.error = failedRequest.message || 'Unable to save profile changes.'
       }
 
-      if (this.user) {
+      if (!failedRequest && this.user) {
         this.user = {
           ...this.user,
           name: payload.name,
-          email: payload.email,
           phone: payload.phone,
-          location: payload.location
+          location: payload.location,
+          avatar: payload.avatar ? normalizeAvatarUrl(payload.avatar) : this.user.avatar
         }
       }
 
-      if (this.profile) {
+      if (!failedRequest && this.profile) {
         this.profile = {
           ...this.profile,
           bio: payload.bio,
@@ -405,17 +449,77 @@ export const useProfileStore = defineStore('profile', {
             university: payload.university,
             fieldOfStudy: payload.fieldOfStudy,
             academicYear: payload.academicYear,
+            semester: payload.semester,
             studentId: payload.studentId
-          }
+          },
+          socialLinks: payload.socialLinks
         }
       }
 
       return !failedRequest
     },
-    async updateAvatar(file: File) {
-      const previewUrl = URL.createObjectURL(file)
-      if (this.user) this.user.avatar = previewUrl
-      return true
+
+    /**
+     * Upload a new avatar image to the backend.
+     * Uses the dedicated POST /api/users/me/avatar endpoint (multer diskStorage → /uploads).
+     * The returned relative /uploads/filename path is normalized to an absolute URL
+     * via normalizeAvatarUrl so that <img> can resolve it in the browser.
+     * request() automatically attaches the Authorization Bearer token.
+     */
+    async updateAvatar(file: File, updateGlobalState = true) {
+      const api = useApi()
+      const formData = new FormData()
+      formData.append('avatar', file)
+
+      // Do NOT pass headers: {} — that would erase the Authorization token added by request().
+      const res = await api.request<{ avatar: string; user: any }>('/users/me/avatar', {
+        method: 'POST',
+        body: formData
+      })
+
+      if (res.success) {
+        const rawAvatar = (res.data as any)?.avatar || (res.data as any)?.user?.avatar
+        const normalized = normalizeAvatarUrl(rawAvatar)
+        if (normalized) {
+          if (updateGlobalState && this.user) {
+            this.user = { ...this.user, avatar: normalized }
+          }
+          return { success: true, avatar: normalized, rawAvatar }
+        }
+      }
+
+      this.error = res.message || 'Unable to upload avatar.'
+      return { success: false, error: this.error }
+    },
+
+    /**
+     * Export current authenticated user data as a JSON file.
+     * Uses data already fetched from the authenticated session (no new endpoint).
+     * Triggers a browser file download.
+     */
+    downloadData() {
+      if (!import.meta.client) return
+
+      const exportPayload = {
+        exportedAt: new Date().toISOString(),
+        user: this.user,
+        profile: this.profile,
+        subscription: this.subscription,
+        tokenUsage: this.tokenUsage,
+        stats: this.stats,
+        recentActivity: this.recentActivity,
+        aiPreferences: this.aiPreferences
+      }
+
+      const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = `planify-data-${Date.now()}.json`
+      document.body.appendChild(anchor)
+      anchor.click()
+      document.body.removeChild(anchor)
+      URL.revokeObjectURL(url)
     }
   }
 })

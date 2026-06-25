@@ -1,14 +1,23 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { storeToRefs } from 'pinia'
 
 const { get } = useApi()
 const route = useRoute()
 const router = useRouter()
 
-const user = ref<any>(null)
+// Use profile store for reactive user data (avatar updates everywhere after profile edits)
+const profileStore = useProfileStore()
+const { user: profileUser } = storeToRefs(profileStore)
+
+// Fallback local user ref for sidebar-specific data not yet loaded into profile store
+const localUser = ref<any>(null)
 const tokenBalance = ref<number | null>(null)
 const plan = ref<any>(null)
+
+// Computed: prefer profile store user (reactive), fall back to local fetch
+const user = computed(() => profileUser.value || localUser.value)
 
 function toNumber(value: unknown): number | null {
   const n = Number(value)
@@ -120,7 +129,7 @@ onMounted(async () => {
     const subData = subRes.success ? (subRes.data as any) : null
     const tokenData = tokenRes.success ? (tokenRes.data as any) : null
 
-    user.value = meData?.user || meData?.data || meData || null
+    localUser.value = meData?.user || meData?.data || meData || null
 
     tokenBalance.value = toNumber(
       tokenData?.tokenBalance
@@ -321,18 +330,10 @@ onMounted(async () => {
             @click="router.push('/settings/profile')"
             class="flex items-center gap-3 rounded-[16px] border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-3 hover:bg-slate-50 dark:hover:bg-slate-800 transition cursor-pointer shadow-[0_2px_8px_-4px_rgba(0,0,0,0.05)]"
           >
-            <UAvatar
-              v-if="user"
-              :src="user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=random`"
-              :alt="user.name"
+            <AppAvatar
+              :src="user?.avatar"
+              :name="user?.name"
               size="sm"
-              class="rounded-full size-[36px]"
-            />
-            <UAvatar
-              v-else
-              size="sm"
-              icon="i-lucide-user"
-              class="rounded-full size-[36px]"
             />
 
             <div class="min-w-0 flex-1 pl-1">

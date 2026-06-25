@@ -156,7 +156,7 @@ async function removePaymentMethod(id: string) {
               </div>
 
               <div class="mt-4 grid gap-3 border-t border-[var(--color-border)] pt-3 text-sm md:grid-cols-3">
-                <div>
+                <div v-if="subscription?.name && !subscription.name.toLowerCase().includes('free') && subscription?.nextBillingDate">
                   <p class="text-muted">Next Billing Date</p>
                   <p class="mt-1 font-semibold text-[var(--color-text)]">{{ toDateLabel(subscription?.nextBillingDate) }}</p>
                 </div>
