@@ -21,17 +21,43 @@ async function confirmCancelSubscription() {
 
 // Payment Modal State
 const isPaymentModalOpen = ref(false)
-const isUpdateMode = ref(false)
 const isSubmittingPayment = ref(false)
-const paymentForm = ref({
-  brand: 'Visa',
-  number: '',
-  expiry: '',
-  cvv: ''
-})
+const selectedCardId = ref('')
+
+const route = useRoute()
+const router = useRouter()
 
 onMounted(async () => {
-  await billingStore.loadBillingData()
+  const hasStripeSuccess = Boolean(route.query.stripe_success && route.query.session_id)
+
+  if (hasStripeSuccess) {
+    const sessionId = String(route.query.session_id)
+    const query = { ...route.query }
+    delete query.stripe_success
+    delete query.session_id
+    delete query.stripe_cancel
+    await router.replace({ query })
+
+    feedback.value = { tone: 'info', text: 'Payment method is being verified...' }
+
+    const methods = await billingStore.ensureStripePaymentMethod(sessionId, 5, 1500)
+    const verified = Boolean(methods && methods.length > 0)
+
+    if (verified) {
+      feedback.value = { tone: 'success', text: 'Payment method added successfully.' }
+    } else {
+      feedback.value = { tone: 'warning', text: 'Stripe verification is taking longer than expected. Please refresh in a moment.' }
+    }
+  } else {
+    await billingStore.loadBillingData()
+
+    if (route.query.stripe_cancel) {
+      const query = { ...route.query }
+      delete query.stripe_cancel
+      router.replace({ query })
+      feedback.value = { tone: 'info', text: 'Card setup was cancelled.' }
+    }
+  }
 })
 
 const defaultPaymentMethod = computed(() => {
@@ -67,34 +93,16 @@ async function retryFetch() {
   await billingStore.loadBillingData()
 }
 
-function openAddPaymentModal() {
-  isUpdateMode.value = false
-  paymentForm.value = {
-    brand: 'Visa',
-    number: '',
-    expiry: '',
-    cvv: ''
+async function openAddPaymentModal() {
+  isProcessingAction.value = true
+  try {
+    await billingStore.refreshPaymentMethods()
+  } catch (err) {
+    console.error('Error loading latest payment methods:', err)
+  } finally {
+    isProcessingAction.value = false
   }
-  isPaymentModalOpen.value = true
-}
-
-function openUpdatePaymentModal() {
-  isUpdateMode.value = true
-  if (defaultPaymentMethod.value) {
-    paymentForm.value = {
-      brand: defaultPaymentMethod.value.brand || 'Visa',
-      number: defaultPaymentMethod.value.label || '',
-      expiry: defaultPaymentMethod.value.expiry || '',
-      cvv: ''
-    }
-  } else {
-    paymentForm.value = {
-      brand: 'Visa',
-      number: '',
-      expiry: '',
-      cvv: ''
-    }
-  }
+  selectedCardId.value = defaultPaymentMethod.value?.id || paymentMethods.value[0]?.id || ''
   isPaymentModalOpen.value = true
 }
 
@@ -102,43 +110,38 @@ function closePaymentModal() {
   isPaymentModalOpen.value = false
 }
 
-async function submitPaymentMethod() {
+async function useSelectedCard() {
+  if (!selectedCardId.value) return
   isSubmittingPayment.value = true
   feedback.value = null
   try {
-    const rawNumber = paymentForm.value.number.replace(/\s+/g, '')
-    const last4 = rawNumber.slice(-4) || '4242'
-    const label = `${paymentForm.value.brand} ending in ${last4}`
-
-    // If update mode, first remove current default payment method if it exists
-    if (isUpdateMode.value && defaultPaymentMethod.value) {
-      await billingStore.removePaymentMethod(defaultPaymentMethod.value.id)
-    }
-
-    const ok = await billingStore.addPaymentMethod({
-      brand: paymentForm.value.brand,
-      label: label,
-      expiry: paymentForm.value.expiry
-    })
-    
+    const ok = await billingStore.setPlanDefaultPaymentMethod(selectedCardId.value)
     if (ok) {
-      await billingStore.refreshBillingData(true)
-      feedback.value = {
-        tone: 'success',
-        text: isUpdateMode.value ? 'Payment method updated successfully.' : 'Payment method added successfully.'
-      }
+      const methods = await billingStore.refreshPaymentMethods()
+      feedback.value = methods ? { tone: 'success', text: 'Default payment method updated successfully.' } : { tone: 'warning', text: error.value || 'Updated the default payment method, but failed to refresh the list.' }
       closePaymentModal()
     } else {
-      feedback.value = {
-        tone: 'warning',
-        text: error.value || 'Failed to save payment method.'
-      }
+      feedback.value = { tone: 'warning', text: error.value || 'Failed to update default payment method.' }
     }
   } catch (err: any) {
-    feedback.value = {
-      tone: 'warning',
-      text: err?.message || 'An error occurred while saving the payment method.'
+    feedback.value = { tone: 'warning', text: err?.message || 'An error occurred.' }
+  } finally {
+    isSubmittingPayment.value = false
+  }
+}
+
+async function redirectToStripe() {
+  isSubmittingPayment.value = true
+  feedback.value = null
+  try {
+    const url = await billingStore.getStripeSetupSession()
+    if (url) {
+      window.location.href = url
+    } else {
+      feedback.value = { tone: 'warning', text: error.value || 'Failed to initialize Stripe checkout.' }
     }
+  } catch (err: any) {
+    feedback.value = { tone: 'warning', text: err?.message || 'An error occurred.' }
   } finally {
     isSubmittingPayment.value = false
   }
@@ -150,11 +153,8 @@ async function removePayment(id: string) {
   try {
     const ok = await billingStore.removePaymentMethod(id)
     if (ok) {
-      await billingStore.refreshBillingData(true)
-      feedback.value = {
-        tone: 'success',
-        text: 'Payment method removed successfully.'
-      }
+      const methods = await billingStore.refreshPaymentMethods()
+      feedback.value = methods ? { tone: 'success', text: 'Payment method removed successfully.' } : { tone: 'warning', text: error.value || 'Removed the payment method, but failed to refresh the list.' }
     } else {
       feedback.value = {
         tone: 'warning',
@@ -342,7 +342,7 @@ async function reactivateSubscription() {
               </div>
               <div v-else>
                 <!-- Empty State -->
-                <div v-if="!defaultPaymentMethod" class="flex flex-col items-center justify-center p-8 text-center border border-dashed border-[var(--color-border)] rounded-2xl bg-[var(--color-bg-soft)]/30">
+                <div v-if="!paymentMethods || paymentMethods.length === 0" class="flex flex-col items-center justify-center p-8 text-center border border-dashed border-[var(--color-border)] rounded-2xl bg-[var(--color-bg-soft)]/30">
                   <div class="icon-box icon-box-primary mb-3">
                     <UIcon name="i-lucide-credit-card" class="size-6 text-[var(--color-primary)]" />
                   </div>
@@ -357,50 +357,61 @@ async function reactivateSubscription() {
                     <span>Add Payment Method</span>
                   </button>
                 </div>
-                <!-- Card Style matching Billing page -->
-                <div v-else class="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm">
-                  <div class="flex items-start justify-between gap-4">
-                    <div class="flex items-center gap-3">
-                      <div class="icon-box icon-box-warning !size-11">
-                        <UIcon :name="brandIcon(defaultPaymentMethod.brand)" class="size-5" />
+                <!-- Card Style rendering directly from billingStore.paymentMethods -->
+                <div v-else class="space-y-4">
+                  <div 
+                    v-for="method in paymentMethods" 
+                    :key="method.stripePaymentMethodId || method._id" 
+                    class="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm"
+                  >
+                    <div class="flex items-start justify-between gap-4">
+                      <div class="flex items-center gap-3">
+                        <div class="icon-box icon-box-warning !size-11">
+                          <UIcon :name="brandIcon(method.brand)" class="size-5" />
+                        </div>
+                        <div>
+                          <p class="font-bold text-base text-[var(--color-text)]">
+                            {{ method.label }}
+                          </p>
+                          <p class="text-sm text-muted mt-1">
+                            Expiration: {{ method.expiry }}
+                          </p>
+                          <p class="text-sm text-muted mt-1">
+                            Billing Address: Default billing address
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <p class="font-bold text-base text-[var(--color-text)]">
-                          {{ defaultPaymentMethod.label }}
-                        </p>
-                        <p class="text-sm text-muted mt-1">
-                          Expiration: {{ defaultPaymentMethod.expiry }}
-                        </p>
-                        <p class="text-sm text-muted mt-1">
-                          Billing Address: Default billing address
-                        </p>
-                      </div>
+                      <span v-if="method.isDefault" class="status-badge status-success">Default</span>
                     </div>
-                    <span class="status-badge status-success">Default</span>
+
+                    <div class="mt-4 flex flex-wrap gap-3 border-t border-[var(--color-border)] pt-3">
+                      <button 
+                        v-if="!method.isDefault"
+                        type="button" 
+                        class="h-9 px-4 text-xs font-semibold text-white bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] rounded-xl transition cursor-pointer"
+                        @click="selectedCardId = method.id; useSelectedCard()"
+                        :disabled="isProcessingAction"
+                      >
+                        Set as default
+                      </button>
+                      <button 
+                        type="button" 
+                        class="h-9 px-4 text-xs font-semibold text-[var(--color-danger)] hover:bg-[var(--color-danger)]/10 rounded-xl transition cursor-pointer bg-transparent"
+                        @click="removePayment(method.id)"
+                        :disabled="isProcessingAction"
+                      >
+                        Remove card
+                      </button>
+                    </div>
                   </div>
 
                   <div class="mt-6 flex flex-wrap gap-3 border-t border-[var(--color-border)] pt-4">
                     <button 
                       type="button" 
                       class="h-10 px-4 text-sm font-semibold text-white bg-[var(--color-primary)] hover:bg-[var(--color-primary-hover)] rounded-xl transition cursor-pointer"
-                      @click="openUpdatePaymentModal"
-                    >
-                      Update payment method
-                    </button>
-                    <button 
-                      type="button" 
-                      class="h-10 px-4 text-sm font-semibold text-[var(--color-primary)] border border-[var(--color-primary)] hover:bg-[var(--color-primary-soft)] rounded-xl transition cursor-pointer bg-transparent"
                       @click="openAddPaymentModal"
                     >
-                      Add new payment method
-                    </button>
-                    <button 
-                      type="button" 
-                      class="h-10 px-4 text-sm font-semibold text-[var(--color-danger)] hover:bg-[var(--color-danger)]/10 rounded-xl transition cursor-pointer bg-transparent"
-                      @click="removePayment(defaultPaymentMethod.id)"
-                      :disabled="isProcessingAction"
-                    >
-                      Remove payment method
+                      Update payment methods
                     </button>
                   </div>
                 </div>
@@ -523,73 +534,94 @@ async function reactivateSubscription() {
         >
           <h3 class="text-xl font-extrabold text-[var(--color-text)] flex items-center gap-2">
             <UIcon name="i-lucide-credit-card" class="size-5 text-[var(--color-primary)]" />
-            <span>{{ isUpdateMode ? 'Update Payment Method' : 'Add Payment Method' }}</span>
+            <span>Manage Payment Methods</span>
           </h3>
 
-          <form @submit.prevent="submitPaymentMethod" class="mt-4 space-y-4">
-            <div>
-              <label class="block text-xs font-semibold text-muted uppercase tracking-wider mb-1">Card Brand</label>
-              <select v-model="paymentForm.brand" class="w-full h-10 px-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-soft)] text-sm text-[var(--color-text)] focus:outline-none focus:border-[var(--color-primary)]">
-                <option value="Visa">Visa</option>
-                <option value="Mastercard">Mastercard</option>
-              </select>
+          <!-- Case 1: User has saved payment methods -->
+          <div v-if="paymentMethods && paymentMethods.length > 0" class="mt-4 space-y-4">
+            <p class="text-sm text-[var(--color-text-soft)]">
+              Select a card to use as your default payment method or add a new card securely through Stripe.
+            </p>
+
+            <div class="space-y-2.5 max-h-60 overflow-y-auto pr-1">
+              <label 
+                v-for="method in paymentMethods" 
+                :key="method.stripePaymentMethodId || method._id" 
+                class="flex items-center justify-between p-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-soft)]/20 hover:bg-[var(--color-bg-soft)]/40 transition cursor-pointer"
+                :class="{ 'border-[var(--color-primary)] bg-[var(--color-primary-soft)]/5': selectedCardId === method.id }"
+              >
+                <div class="flex items-center gap-3">
+                  <input 
+                    type="radio" 
+                    :value="method.id" 
+                    v-model="selectedCardId" 
+                    class="accent-[var(--color-primary)] size-4" 
+                  />
+                  <div class="flex items-center gap-2">
+                    <UIcon :name="brandIcon(method.brand)" class="size-5 text-[var(--color-text-soft)]" />
+                    <span class="text-sm font-semibold text-[var(--color-text)]">{{ method.label }}</span>
+                  </div>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="text-xs text-muted">Exp: {{ method.expiry }}</span>
+                  <span v-if="method.isDefault" class="status-badge status-success text-[10px] font-medium px-1.5 py-0.5 rounded">Default</span>
+                </div>
+              </label>
             </div>
 
-            <div>
-              <label class="block text-xs font-semibold text-muted uppercase tracking-wider mb-1">Card Number</label>
-              <input 
-                v-model="paymentForm.number" 
-                type="text" 
-                placeholder="4242 4242 4242 4242" 
-                maxlength="19" 
-                class="w-full h-10 px-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-soft)] text-sm text-[var(--color-text)] focus:outline-none focus:border-[var(--color-primary)]" 
-                required
-              />
-            </div>
-
-            <div class="grid grid-cols-2 gap-4">
-              <div>
-                <label class="block text-xs font-semibold text-muted uppercase tracking-wider mb-1">Expiration (MM/YY)</label>
-                <input 
-                  v-model="paymentForm.expiry" 
-                  type="text" 
-                  placeholder="07/28" 
-                  maxlength="5" 
-                  class="w-full h-10 px-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-soft)] text-sm text-[var(--color-text)] focus:outline-none focus:border-[var(--color-primary)]" 
-                  required
-                />
-              </div>
-              <div>
-                <label class="block text-xs font-semibold text-muted uppercase tracking-wider mb-1">CVC / CVV</label>
-                <input 
-                  v-model="paymentForm.cvv" 
-                  type="password" 
-                  placeholder="123" 
-                  maxlength="3" 
-                  class="w-full h-10 px-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-soft)] text-sm text-[var(--color-text)] focus:outline-none focus:border-[var(--color-primary)]" 
-                  required
-                />
-              </div>
-            </div>
-
-            <div class="mt-6 flex justify-end gap-3">
+            <div class="mt-6 flex flex-col gap-2">
               <button
                 type="button"
-                class="h-10 rounded-xl border border-[var(--color-border)] px-4 text-sm font-semibold text-[var(--color-text)] hover:bg-[var(--color-bg-soft)] transition"
-                @click="closePaymentModal"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                class="h-10 rounded-xl bg-[var(--color-primary)] px-4 text-sm font-semibold text-white hover:bg-[var(--color-primary-hover)] transition flex items-center justify-center gap-2"
+                class="h-10 w-full rounded-xl bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)] font-semibold text-sm transition flex items-center justify-center gap-2 cursor-pointer border-0"
+                @click="useSelectedCard"
                 :disabled="isSubmittingPayment"
               >
                 <UIcon v-if="isSubmittingPayment" name="i-lucide-loader-2" class="size-4 animate-spin" />
-                <span>Save Card</span>
+                <span>Use Selected Card</span>
+              </button>
+              <button
+                type="button"
+                class="h-10 w-full rounded-xl border border-[var(--color-border)] text-[var(--color-primary)] hover:bg-[var(--color-primary-soft)] font-semibold text-sm transition flex items-center justify-center gap-2 cursor-pointer bg-transparent"
+                @click="redirectToStripe"
+                :disabled="isSubmittingPayment"
+              >
+                <UIcon name="i-lucide-plus" class="size-4" />
+                <span>Add Another Card</span>
+              </button>
+              <button
+                type="button"
+                class="h-10 w-full rounded-xl border border-[var(--color-border)] text-[var(--color-text)] hover:bg-[var(--color-bg-soft)] font-semibold text-sm transition flex items-center justify-center cursor-pointer bg-transparent"
+                @click="isPaymentModalOpen = false"
+              >
+                Cancel
               </button>
             </div>
-          </form>
+          </div>
+
+          <!-- Case 2: User has no saved card -->
+          <div v-else class="mt-4 space-y-4">
+            <p class="text-sm text-[var(--color-text-soft)]">
+              You will be redirected securely to Stripe to setup your payment method.
+            </p>
+            <div class="mt-6 flex flex-col gap-2">
+              <button
+                type="button"
+                class="h-10 w-full rounded-xl bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)] font-semibold text-sm transition flex items-center justify-center gap-2 cursor-pointer border-0"
+                @click="redirectToStripe"
+                :disabled="isSubmittingPayment"
+              >
+                <UIcon v-if="isSubmittingPayment" name="i-lucide-loader-2" class="size-4 animate-spin" />
+                <span>Add Credit Card</span>
+              </button>
+              <button
+                type="button"
+                class="h-10 w-full rounded-xl border border-[var(--color-border)] text-[var(--color-text)] hover:bg-[var(--color-bg-soft)] font-semibold text-sm transition flex items-center justify-center cursor-pointer bg-transparent"
+                @click="isPaymentModalOpen = false"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </Transition>

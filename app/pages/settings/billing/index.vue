@@ -64,21 +64,85 @@ function manageSubscription() {
   router.push('/settings/billing/manage-subscription')
 }
 
-async function addPaymentMethod() {
-  const ok = await billingStore.addPaymentMethod({ brand: 'Visa', label: 'Visa ending in 3030', expiry: '12/28' })
-  await billingStore.refreshBillingData(true)
-  feedback.value = {
-    tone: ok ? 'success' : 'warning',
-    text: ok ? 'Payment method added.' : (error.value || 'Unable to add payment method.')
+// Payment Modal State
+const isPaymentModalOpen = ref(false)
+const isSubmittingPayment = ref(false)
+const selectedCardId = ref('')
+
+const defaultPaymentMethod = computed(() => {
+  if (!paymentMethods.value || paymentMethods.value.length === 0) return null
+  return paymentMethods.value.find(m => m.isDefault) || paymentMethods.value[0]
+})
+
+function brandIcon(brand: string) {
+  if (!brand) return 'i-lucide-credit-card'
+  const b = brand.toLowerCase()
+  if (b.includes('visa')) return 'i-simple-icons-visa'
+  if (b.includes('mastercard') || b.includes('master')) return 'i-simple-icons-mastercard'
+  return 'i-lucide-credit-card'
+}
+
+async function openAddPaymentModal() {
+  try {
+    await billingStore.refreshPaymentMethods()
+  } catch (err) {
+    console.error('Error loading latest payment methods:', err)
+  }
+  selectedCardId.value = defaultPaymentMethod.value?.id || paymentMethods.value[0]?.id || ''
+  isPaymentModalOpen.value = true
+}
+
+function closePaymentModal() {
+  isPaymentModalOpen.value = false
+}
+
+function addPaymentMethod() {
+  openAddPaymentModal()
+}
+
+async function useSelectedCard() {
+  if (!selectedCardId.value) return
+  isSubmittingPayment.value = true
+  feedback.value = null
+  try {
+    const ok = await billingStore.setPlanDefaultPaymentMethod(selectedCardId.value)
+    if (ok) {
+      const methods = await billingStore.refreshPaymentMethods()
+      feedback.value = methods ? { tone: 'success', text: 'Default payment method updated successfully.' } : { tone: 'warning', text: error.value || 'Updated the default payment method, but failed to refresh the list.' }
+      closePaymentModal()
+    } else {
+      feedback.value = { tone: 'warning', text: error.value || 'Failed to update default payment method.' }
+    }
+  } catch (err: any) {
+    feedback.value = { tone: 'warning', text: err?.message || 'An error occurred.' }
+  } finally {
+    isSubmittingPayment.value = false
+  }
+}
+
+async function redirectToStripe() {
+  isSubmittingPayment.value = true
+  feedback.value = null
+  try {
+    const url = await billingStore.getStripeSetupSession()
+    if (url) {
+      window.location.href = url
+    } else {
+      feedback.value = { tone: 'warning', text: error.value || 'Failed to initialize Stripe checkout.' }
+    }
+  } catch (err: any) {
+    feedback.value = { tone: 'warning', text: err?.message || 'An error occurred.' }
+  } finally {
+    isSubmittingPayment.value = false
   }
 }
 
 async function removePaymentMethod(id: string) {
   const ok = await billingStore.removePaymentMethod(id)
-  await billingStore.refreshBillingData(true)
+  const methods = await billingStore.refreshPaymentMethods()
   feedback.value = {
-    tone: ok ? 'info' : 'warning',
-    text: ok ? 'Payment method removed.' : (error.value || 'Unable to remove payment method.')
+    tone: ok && methods ? 'info' : 'warning',
+    text: ok && methods ? 'Payment method removed.' : (error.value || 'Unable to remove payment method.')
   }
 }
 </script>
@@ -151,7 +215,7 @@ async function removePaymentMethod(id: string) {
             </div>
 
             <div class="mt-4 grid gap-3 sm:grid-cols-2">
-              <NuxtLink to="/settings/billing/plans" class="flex items-center justify-center h-11 rounded-xl border border-[var(--color-primary)] text-sm font-semibold text-[var(--color-primary)] hover:bg-[var(--color-primary-soft)] transition">Change Plan</NuxtLink>
+              <NuxtLink to="/settings/billing/plans" class="flex items-center justify-center h-11 rounded-xl border border-[var(--color-primary)] text-sm font-semibold text-[var(--color-primary)] hover:bg-[var(--color-primary-soft)] transition cursor-pointer">Change Plan</NuxtLink>
               <button class="h-11 rounded-xl bg-[var(--color-primary)] text-sm font-semibold text-white hover:bg-[var(--color-primary-hover)] transition cursor-pointer" @click="manageSubscription">Manage Subscription</button>
             </div>
           </section>
@@ -181,7 +245,7 @@ async function removePaymentMethod(id: string) {
               <span class="text-[var(--color-text-soft)]">{{ totalUsed.toLocaleString() }} / {{ totalLimit.toLocaleString() }} tokens</span>
             </div>
 
-            <button class="mt-5 h-11 w-full rounded-xl border border-[var(--color-primary)] text-sm font-semibold text-[var(--color-primary)]" @click="buyPack(tokenPacks[0]?.id || 'starter')">
+            <button class="mt-5 h-11 w-full rounded-xl border border-[var(--color-primary)] text-sm font-semibold text-[var(--color-primary)] cursor-pointer" @click="buyPack(tokenPacks[0]?.id || 'starter')">
               Buy More Tokens
             </button>
           </section>
@@ -200,7 +264,7 @@ async function removePaymentMethod(id: string) {
               <p class="mt-3 text-base font-semibold text-[var(--color-text)]">{{ pack.name }}</p>
               <p class="text-sm text-muted">{{ pack.tokens.toLocaleString() }} tokens</p>
               <p class="mt-2 text-3xl leading-none font-semibold text-[var(--color-text)]">{{ pack.price.toFixed(2) }} TND</p>
-              <button class="mt-4 h-8 w-full rounded-xl border text-sm font-semibold" :class="pack.popular ? 'border-[var(--color-primary)] bg-[var(--color-primary)] text-white' : 'border-[var(--color-border)] text-[var(--color-primary)]'" @click="buyPack(pack.id)">
+              <button class="mt-4 h-8 w-full rounded-xl border text-sm font-semibold cursor-pointer" :class="pack.popular ? 'border-[var(--color-primary)] bg-[var(--color-primary)] text-white' : 'border-[var(--color-border)] text-[var(--color-primary)]'" @click="buyPack(pack.id)">
                 Buy Now
               </button>
             </article>
@@ -213,14 +277,14 @@ async function removePaymentMethod(id: string) {
               <h3 class="text-lg leading-none font-semibold text-[var(--color-text)]">Payment Methods</h3>
               <p class="mt-1 text-sm text-muted">Manage your saved payment methods.</p>
             </div>
-            <button class="h-10 rounded-xl border border-[var(--color-primary)] px-4 text-sm font-semibold text-[var(--color-primary)]" @click="addPaymentMethod">Add Payment Method</button>
+            <button class="h-10 rounded-xl border border-[var(--color-primary)] px-4 text-sm font-semibold text-[var(--color-primary)] cursor-pointer" @click="addPaymentMethod">Add Payment Method</button>
           </div>
 
           <div class="space-y-3">
             <div v-if="paymentMethods.length === 0" class="rounded-xl border border-[var(--color-border)] px-4 py-8 text-center text-sm text-muted">
               No payment methods added yet.
             </div>
-            <div v-else v-for="method in paymentMethods" :key="method.id" class="flex items-center justify-between rounded-xl border border-[var(--color-border)] px-4 py-3">
+            <div v-else v-for="method in paymentMethods" :key="method.stripePaymentMethodId || method._id" class="flex items-center justify-between rounded-xl border border-[var(--color-border)] px-4 py-3">
               <div class="flex items-center gap-3">
                 <span class="text-base font-bold text-[var(--color-text)]">{{ method.brand.toUpperCase() }}</span>
                 <span class="text-sm text-[var(--color-text)]">{{ method.label }}</span>
@@ -228,7 +292,7 @@ async function removePaymentMethod(id: string) {
               </div>
               <div class="flex items-center gap-4">
                 <span class="text-sm text-muted">Expires {{ method.expiry }}</span>
-                <button class="text-sm font-semibold text-[var(--color-danger)]" @click="removePaymentMethod(method.id)">Remove</button>
+                <button class="text-sm font-semibold text-[var(--color-danger)] cursor-pointer" @click="removePaymentMethod(method.id)">Remove</button>
               </div>
             </div>
           </div>
@@ -240,7 +304,7 @@ async function removePaymentMethod(id: string) {
               <h3 class="text-lg leading-none font-semibold text-[var(--color-text)]">Payment History</h3>
               <p class="mt-1 text-sm text-muted">View your invoices and payment history.</p>
             </div>
-            <NuxtLink to="/settings/billing" class="text-sm font-semibold text-[var(--color-primary)]">View All Invoices</NuxtLink>
+            <NuxtLink to="/settings/billing" class="text-sm font-semibold text-[var(--color-primary)] cursor-pointer">View All Invoices</NuxtLink>
           </div>
 
           <div class="overflow-x-auto">
@@ -277,7 +341,7 @@ async function removePaymentMethod(id: string) {
         <section class="section-card">
           <div class="mb-3 flex items-center justify-between">
             <h3 class="text-lg leading-none font-semibold text-[var(--color-text)]">Usage Summary</h3>
-            <button class="rounded-xl border border-[var(--color-border)] px-3 py-1.5 text-xs font-semibold text-[var(--color-text-soft)]">This Month</button>
+            <button class="rounded-xl border border-[var(--color-border)] px-3 py-1.5 text-xs font-semibold text-[var(--color-text-soft)] cursor-pointer">This Month</button>
           </div>
 
           <div class="space-y-4">
@@ -318,7 +382,7 @@ async function removePaymentMethod(id: string) {
                 <span>{{ feature }}</span>
               </li>
             </ul>
-            <NuxtLink to="/settings/billing/plans" class="mt-4 flex h-10 w-full items-center justify-center rounded-xl border border-[var(--color-primary)] text-sm font-semibold text-[var(--color-primary)] hover:bg-[var(--color-primary-soft)] transition">
+            <NuxtLink to="/settings/billing/plans" class="mt-4 flex h-10 w-full items-center justify-center rounded-xl border border-[var(--color-primary)] text-sm font-semibold text-[var(--color-primary)] hover:bg-[var(--color-primary-soft)] transition cursor-pointer">
               Compare Plans
             </NuxtLink>
           </div>
@@ -340,7 +404,7 @@ async function removePaymentMethod(id: string) {
                   <span>{{ feature }}</span>
                 </li>
               </ul>
-              <NuxtLink to="/settings/billing/plans" class="mt-3 flex h-10 w-full items-center justify-center rounded-xl border border-[var(--color-primary)] text-sm font-semibold text-[var(--color-primary)] hover:bg-[var(--color-primary-soft)] transition">
+              <NuxtLink to="/settings/billing/plans" class="mt-3 flex h-10 w-full items-center justify-center rounded-xl border border-[var(--color-primary)] text-sm font-semibold text-[var(--color-primary)] hover:bg-[var(--color-primary-soft)] transition cursor-pointer">
                 {{ plan.cta }}
               </NuxtLink>
             </div>
@@ -348,11 +412,124 @@ async function removePaymentMethod(id: string) {
         </section>
       </aside>
     </div>
+
+    <!-- Add/Update Payment Method Dialog Modal -->
+    <Transition name="fade">
+      <div
+        v-if="isPaymentModalOpen"
+        class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in"
+      >
+        <div 
+          class="w-full max-w-md rounded-3xl bg-[var(--color-card-bg)] border border-[var(--color-border)] p-6 shadow-floating transform transition-all duration-300 scale-100"
+          role="dialog"
+          aria-modal="true"
+        >
+          <h3 class="text-xl font-extrabold text-[var(--color-text)] flex items-center gap-2">
+            <UIcon name="i-lucide-credit-card" class="size-5 text-[var(--color-primary)]" />
+            <span>Manage Payment Methods</span>
+          </h3>
+
+          <!-- Case 1: User has saved payment methods -->
+          <div v-if="paymentMethods && paymentMethods.length > 0" class="mt-4 space-y-4">
+            <p class="text-sm text-[var(--color-text-soft)]">
+              Select a card to use as your default payment method or add a new card securely through Stripe.
+            </p>
+
+            <div class="space-y-2.5 max-h-60 overflow-y-auto pr-1">
+              <label 
+                v-for="method in paymentMethods" 
+                :key="method.stripePaymentMethodId || method._id" 
+                class="flex items-center justify-between p-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-soft)]/20 hover:bg-[var(--color-bg-soft)]/40 transition cursor-pointer"
+                :class="{ 'border-[var(--color-primary)] bg-[var(--color-primary-soft)]/5': selectedCardId === method.id }"
+              >
+                <div class="flex items-center gap-3">
+                  <input 
+                    type="radio" 
+                    :value="method.id" 
+                    v-model="selectedCardId" 
+                    class="accent-[var(--color-primary)] size-4 cursor-pointer" 
+                  />
+                  <div class="flex items-center gap-2">
+                    <UIcon :name="brandIcon(method.brand)" class="size-5 text-[var(--color-text-soft)]" />
+                    <span class="text-sm font-semibold text-[var(--color-text)] cursor-pointer">{{ method.label }}</span>
+                  </div>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="text-xs text-muted">Exp: {{ method.expiry }}</span>
+                  <span v-if="method.isDefault" class="status-badge status-success text-[10px] font-medium px-1.5 py-0.5 rounded">Default</span>
+                </div>
+              </label>
+            </div>
+
+            <div class="mt-6 flex flex-col gap-2">
+              <button
+                type="button"
+                class="h-10 w-full rounded-xl bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)] font-semibold text-sm transition flex items-center justify-center gap-2 cursor-pointer border-0"
+                @click="useSelectedCard"
+                :disabled="isSubmittingPayment"
+              >
+                <UIcon v-if="isSubmittingPayment" name="i-lucide-loader-2" class="size-4 animate-spin" />
+                <span>Use Selected Card</span>
+              </button>
+              <button
+                type="button"
+                class="h-10 w-full rounded-xl border border-[var(--color-border)] text-[var(--color-primary)] hover:bg-[var(--color-primary-soft)] font-semibold text-sm transition flex items-center justify-center gap-2 cursor-pointer bg-transparent"
+                @click="redirectToStripe"
+                :disabled="isSubmittingPayment"
+              >
+                <UIcon name="i-lucide-plus" class="size-4" />
+                <span>Add Another Card</span>
+              </button>
+              <button
+                type="button"
+                class="h-10 w-full rounded-xl border border-[var(--color-border)] text-[var(--color-text)] hover:bg-[var(--color-bg-soft)] font-semibold text-sm transition flex items-center justify-center cursor-pointer bg-transparent"
+                @click="isPaymentModalOpen = false"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+
+          <!-- Case 2: User has no saved card -->
+          <div v-else class="mt-4 space-y-4">
+            <p class="text-sm text-[var(--color-text-soft)]">
+              You will be redirected securely to Stripe to setup your payment method.
+            </p>
+            <div class="mt-6 flex flex-col gap-2">
+              <button
+                type="button"
+                class="h-10 w-full rounded-xl bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)] font-semibold text-sm transition flex items-center justify-center gap-2 cursor-pointer border-0"
+                @click="redirectToStripe"
+                :disabled="isSubmittingPayment"
+              >
+                <UIcon v-if="isSubmittingPayment" name="i-lucide-loader-2" class="size-4 animate-spin" />
+                <span>Add Credit Card</span>
+              </button>
+              <button
+                type="button"
+                class="h-10 w-full rounded-xl border border-[var(--color-border)] text-[var(--color-text)] hover:bg-[var(--color-bg-soft)] font-semibold text-sm transition flex items-center justify-center cursor-pointer bg-transparent"
+                @click="isPaymentModalOpen = false"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Transition>
   </section>
 </template>
 
 <style scoped>
 p {
   margin-bottom: 0;
+}
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 </style>
