@@ -182,6 +182,157 @@ function copyToClipboard(text: string) {
   }
 }
 
+function safeParseJson(value: unknown) {
+  if (typeof value !== 'string') return null
+
+  try {
+    return JSON.parse(value)
+  } catch {
+    return null
+  }
+}
+
+function extractPlainText(value: unknown): string {
+  if (typeof value === 'string') return value
+  if (value && typeof value === 'object') {
+    const record = value as Record<string, any>
+    return record.reply || record.text || record.message || record.summary || ''
+  }
+  return ''
+}
+
+function normalizeChatReply(value: unknown): string {
+  const parsed = safeParseJson(value)
+  if (parsed && typeof parsed === 'object') {
+    return extractPlainText(parsed)
+  }
+  return extractPlainText(value)
+}
+
+function normalizePromptText(item: any): string {
+  const fallback = item?.metadata?.historyPrompt || item?.prompt || ''
+  if (item?.metadata?.historyPrompt) return item.metadata.historyPrompt
+
+  const parsedPrompt = safeParseJson(item?.prompt)
+  if (!parsedPrompt) return fallback
+
+  if (item.type === 'daily_plan') {
+    return `Create a study plan for ${parsedPrompt.date || 'today'} with ${parsedPrompt.focusHours || 6} focus hours.`
+  }
+
+  if (item.type === 'exercises') {
+    return `Generate ${parsedPrompt.count || 3} practice exercises on topic "${parsedPrompt.topic || 'General'}".`
+  }
+
+  if (item.type === 'summary' || item.type === 'summarize_file') {
+    return 'Summarize the selected study material.'
+  }
+
+  if (item.type === 'prioritize_tasks') {
+    return 'Prioritize my current tasks.'
+  }
+
+  if (item.type === 'revision_plan') {
+    return 'Create a revision plan for my course or exam.'
+  }
+
+  return fallback
+}
+
+function normalizeSummaryResponse(value: unknown) {
+  const parsed = safeParseJson(value)
+  if (parsed && typeof parsed === 'object') {
+    return {
+      title: parsed.title || 'Summary',
+      summary: parsed.summary || extractPlainText(parsed) || '',
+      keyPoints: Array.isArray(parsed.keyPoints) ? parsed.keyPoints : [],
+      wordCount: typeof parsed.wordCount === 'number' ? parsed.wordCount : undefined,
+      readingTime: parsed.readingTime || undefined
+    }
+  }
+
+  return {
+    title: 'Summary',
+    summary: extractPlainText(value),
+    keyPoints: [],
+  }
+}
+
+function normalizeExercisesResponse(value: unknown) {
+  const parsed = safeParseJson(value)
+  if (parsed && typeof parsed === 'object') {
+    return {
+      courseTitle: parsed.courseTitle || 'Course',
+      topic: parsed.topic || 'General',
+      difficulty: parsed.difficulty || 'medium',
+      exercises: Array.isArray(parsed.exercises) ? parsed.exercises : []
+    }
+  }
+
+  return {
+    courseTitle: 'Course',
+    topic: 'General',
+    difficulty: 'medium',
+    exercises: []
+  }
+}
+
+function normalizePlanResponse(value: unknown) {
+  const parsed = safeParseJson(value)
+  if (parsed && typeof parsed === 'object') {
+    return {
+      date: parsed.date || '',
+      focusHours: parsed.focusHours || parsed.totalStudyHours || 0,
+      totalStudyHours: parsed.totalStudyHours || parsed.focusHours || 0,
+      plan: Array.isArray(parsed.plan) ? parsed.plan : [],
+      tip: parsed.tip || (Array.isArray(parsed.tips) ? parsed.tips[0] : ''),
+      overview: parsed.overview || ''
+    }
+  }
+
+  return {
+    date: '',
+    focusHours: 0,
+    totalStudyHours: 0,
+    plan: [],
+    tip: extractPlainText(value),
+    overview: ''
+  }
+}
+
+function extractAssistantText(msg: AIMessage): string {
+  if (msg.sender === 'user') {
+    return msg.text || ''
+  }
+
+  if (msg.type === 'summary' && msg.summaryData) {
+    return msg.summaryData.summary || ''
+  }
+
+  if (msg.type === 'exercises' && msg.exercisesData) {
+    const firstQuestion = msg.exercisesData.exercises?.[0]?.question
+    return firstQuestion ? `Practice exercises on ${msg.exercisesData.topic}. ${firstQuestion}` : `Practice exercises on ${msg.exercisesData.topic}.`
+  }
+
+  if (msg.type === 'daily_plan' && msg.planData) {
+    return msg.planData.overview || msg.planData.tip || 'Daily study plan generated.'
+  }
+
+  return msg.text || ''
+}
+
+function buildRecentConversation(maxItems = 8) {
+  return aiMessages.value
+    .filter((msg) => !msg.isGenerating)
+    .slice(-maxItems)
+    .map((msg) => ({
+      role: msg.sender,
+      content: extractAssistantText(msg).trim(),
+      type: msg.type,
+    }))
+    .filter((msg) => msg.content.length > 0)
+}
+
 // ── Backend AI History Parser ─────────────────────────────────────────────────
 function parseAIHistory(historyData: any[]): AIMessage[] {
   const msgs: AIMessage[] = []
@@ -190,26 +341,7 @@ function parseAIHistory(historyData: any[]): AIMessage[] {
 
   for (const item of sorted) {
     // 1. User Message
-    let promptText = item.prompt
-    if (item.type === 'daily_plan' || item.type === 'exercises') {
-      try {
-        const parsedPrompt = JSON.parse(item.prompt)
-        if (item.type === 'daily_plan') {
-          promptText = `Create a study plan for ${parsedPrompt.date || 'today'} with ${parsedPrompt.focusHours || 6} focus hours.`
-        } else if (item.type === 'exercises') {
-          promptText = `Generate ${parsedPrompt.count || 3} practice exercises on topic "${parsedPrompt.topic || 'General'}".`
-        }
-      } catch {
-        promptText = item.prompt
-      }
-    } else if (item.type === 'summary') {
-      try {
-        const parsedPrompt = JSON.parse(item.prompt)
-        promptText = `Summarize selected document/course.`
-      } catch {
-        promptText = item.prompt
-      }
-    }
+    const promptText = normalizePromptText(item)
 
     msgs.push({
       id: `${item._id}_user`,
@@ -230,16 +362,21 @@ function parseAIHistory(historyData: any[]): AIMessage[] {
 
     try {
       if (item.type === 'summary') {
-        assistantMsg.summaryData = JSON.parse(item.response)
+        assistantMsg.summaryData = normalizeSummaryResponse(item.response)
       } else if (item.type === 'exercises') {
-        assistantMsg.exercisesData = JSON.parse(item.response)
+        assistantMsg.exercisesData = normalizeExercisesResponse(item.response)
       } else if (item.type === 'daily_plan') {
-        assistantMsg.planData = JSON.parse(item.response)
+        assistantMsg.planData = normalizePlanResponse(item.response)
+      } else if (item.type === 'chat') {
+        assistantMsg.text = normalizeChatReply(item.response)
+      } else if (item.type === 'prioritize_tasks' || item.type === 'revision_plan' || item.type === 'dashboard_recommendations') {
+        const parsed = safeParseJson(item.response)
+        assistantMsg.text = extractPlainText(parsed) || extractPlainText(item.response)
       } else {
-        assistantMsg.text = item.response
+        assistantMsg.text = extractPlainText(item.response)
       }
     } catch {
-      assistantMsg.text = item.response
+      assistantMsg.text = extractPlainText(item.response)
       assistantMsg.type = 'chat'
     }
 
@@ -325,6 +462,7 @@ async function sendChatMessage() {
   const userMsgText = chatMessage.value.trim()
   chatMessage.value = ''
   isSending.value = true
+  const recentMessages = buildRecentConversation()
 
   // Insert user message locally
   const tempUserMsgId = 'temp_user_' + Date.now()
@@ -354,6 +492,12 @@ async function sendChatMessage() {
     if (selectedCourseId.value) {
       payload.courseId = selectedCourseId.value
     }
+    if (selectedFileId.value) {
+      payload.fileId = selectedFileId.value
+    }
+    if (recentMessages.length > 0) {
+      payload.recentMessages = recentMessages
+    }
 
     const res = await post<any>('/ai/chat', payload)
     
@@ -361,12 +505,13 @@ async function sendChatMessage() {
     aiMessages.value = aiMessages.value.filter(m => m.id !== tempAssistantMsgId)
 
     if (res.success && res.data) {
+      const replyText = normalizeChatReply(res.data.reply || res.data.message || res.data.chat)
       aiMessages.value.push({
         id: 'msg_ai_' + Date.now(),
         sender: 'assistant',
         timestamp: formatTime(new Date().toISOString()),
         type: 'chat',
-        text: res.data.reply,
+        text: replyText,
         tokensUsed: res.data.tokensUsed
       })
       await refreshBalanceAndHistory()
