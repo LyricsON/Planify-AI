@@ -9,7 +9,7 @@ const feedback = ref<{ tone: 'success' | 'warning' | 'info', text: string } | nu
 const router = useRouter()
 
 onMounted(async () => {
-  await billingStore.fetchBilling()
+  await billingStore.loadBillingData()
 })
 
 function toDateLabel(value?: string) {
@@ -49,7 +49,7 @@ const currentPlanFeatures = [
 
 async function buyPack(id: string) {
   const ok = await billingStore.buyTokenPack(id)
-  await billingStore.fetchBilling()
+  await billingStore.refreshBillingData(true)
   feedback.value = {
     tone: ok ? 'success' : 'warning',
     text: ok ? 'Token pack purchased successfully.' : (error.value || 'Unable to purchase token pack.')
@@ -60,18 +60,13 @@ function changePlan() {
   router.push('/settings/billing/plans')
 }
 
-async function manageSubscription() {
-  const ok = await billingStore.cancelPlan()
-  await billingStore.fetchBilling()
-  feedback.value = {
-    tone: ok ? 'info' : 'warning',
-    text: ok ? 'Subscription action completed.' : (error.value || 'Unable to manage subscription.')
-  }
+function manageSubscription() {
+  router.push('/settings/billing/manage-subscription')
 }
 
 async function addPaymentMethod() {
   const ok = await billingStore.addPaymentMethod({ brand: 'Visa', label: 'Visa ending in 3030', expiry: '12/28' })
-  await billingStore.fetchBilling()
+  await billingStore.refreshBillingData(true)
   feedback.value = {
     tone: ok ? 'success' : 'warning',
     text: ok ? 'Payment method added.' : (error.value || 'Unable to add payment method.')
@@ -80,7 +75,7 @@ async function addPaymentMethod() {
 
 async function removePaymentMethod(id: string) {
   const ok = await billingStore.removePaymentMethod(id)
-  await billingStore.fetchBilling()
+  await billingStore.refreshBillingData(true)
   feedback.value = {
     tone: ok ? 'info' : 'warning',
     text: ok ? 'Payment method removed.' : (error.value || 'Unable to remove payment method.')
@@ -157,7 +152,7 @@ async function removePaymentMethod(id: string) {
 
             <div class="mt-4 grid gap-3 sm:grid-cols-2">
               <NuxtLink to="/settings/billing/plans" class="flex items-center justify-center h-11 rounded-xl border border-[var(--color-primary)] text-sm font-semibold text-[var(--color-primary)] hover:bg-[var(--color-primary-soft)] transition">Change Plan</NuxtLink>
-              <button class="h-11 rounded-xl bg-[var(--color-primary)] text-sm font-semibold text-white" @click="manageSubscription">Manage Subscription</button>
+              <button class="h-11 rounded-xl bg-[var(--color-primary)] text-sm font-semibold text-white hover:bg-[var(--color-primary-hover)] transition cursor-pointer" @click="manageSubscription">Manage Subscription</button>
             </div>
           </section>
 

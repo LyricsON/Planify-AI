@@ -140,52 +140,87 @@ export const useBillingStore = defineStore('billing', {
     pricingPlans: [] as PricingPlan[],
     loading: false,
     error: '' as string | null,
-    usingMockData: false
+    usingMockData: false,
+    lastFetched: null as number | null,
+    fetchPromise: null as Promise<void> | null
   }),
   actions: {
-    async fetchBilling() {
+    async loadBillingData(force = false) {
+      if (this.fetchPromise) {
+        return this.fetchPromise
+      }
+
+      const CACHE_TTL = 30000 // 30 seconds cache guard
+      if (!force && this.lastFetched && (Date.now() - this.lastFetched < CACHE_TTL)) {
+        return Promise.resolve()
+      }
+
       this.loading = true
       this.error = null
       const api = useApi()
 
-      try {
-        const [subscriptionRes, balanceRes, historyRes, paymentMethodsRes, tokenHistoryRes, tokenPacksRes, plansRes] = await Promise.all([
-          withTimeout(api.get<any>('/subscriptions/me')),
-          withTimeout(api.get<any>('/tokens/balance')),
-          withTimeout(api.get<any>('/payments')),
-          withTimeout(api.get<any>('/payments/methods')),
-          withTimeout(api.get<any>('/tokens/history')),
-          withTimeout(api.get<any>('/tokens/packs')),
-          withTimeout(api.get<any>('/subscriptions/plans'))
-        ])
+      this.fetchPromise = (async () => {
+        try {
+          const results = await Promise.allSettled([
+            withTimeout(api.get<any>('/subscriptions/me')),
+            withTimeout(api.get<any>('/tokens/balance')),
+            withTimeout(api.get<any>('/payments')),
+            withTimeout(api.get<any>('/payments/methods')),
+            withTimeout(api.get<any>('/tokens/history')),
+            withTimeout(api.get<any>('/tokens/packs')),
+            withTimeout(api.get<any>('/subscriptions/plans'))
+          ])
 
-        this.subscription = normalizeSubscription(subscriptionRes.success ? subscriptionRes.data : null)
-        this.tokenBalance = normalizeTokenBalance(balanceRes.success ? balanceRes.data : null, this.subscription)
-        this.tokenUsage = normalizeTokenUsage(tokenHistoryRes.success ? ((tokenHistoryRes.data as any)?.data || tokenHistoryRes.data) : [])
-        this.tokenPacks = Array.isArray((tokenPacksRes.data as any)?.data)
-          ? (tokenPacksRes.data as any).data
-          : Array.isArray(tokenPacksRes.data)
-            ? tokenPacksRes.data as TokenPack[]
-            : []
-        this.paymentMethods = normalizePaymentMethods(paymentMethodsRes.success ? ((paymentMethodsRes.data as any)?.data || paymentMethodsRes.data) : [])
-        this.paymentHistory = normalizePayments(historyRes.success ? ((historyRes.data as any)?.data || historyRes.data) : [])
-        this.pricingPlans = normalizePlans(plansRes.success ? ((plansRes.data as any)?.data || plansRes.data) : [])
+          const subscriptionRes = results[0].status === 'fulfilled' ? results[0].value : { success: false, message: 'Failed to load subscription' }
+          const balanceRes = results[1].status === 'fulfilled' ? results[1].value : { success: false, message: 'Failed to load balance' }
+          const historyRes = results[2].status === 'fulfilled' ? results[2].value : { success: false, message: 'Failed to load history' }
+          const paymentMethodsRes = results[3].status === 'fulfilled' ? results[3].value : { success: false, message: 'Failed to load payment methods' }
+          const tokenHistoryRes = results[4].status === 'fulfilled' ? results[4].value : { success: false, message: 'Failed to load token history' }
+          const tokenPacksRes = results[5].status === 'fulfilled' ? results[5].value : { success: false, message: 'Failed to load token packs' }
+          const plansRes = results[6].status === 'fulfilled' ? results[6].value : { success: false, message: 'Failed to load plans' }
 
-        const hardFailures = [subscriptionRes, balanceRes].filter((r) => !r.success)
-        const softFailures = [historyRes, paymentMethodsRes, tokenHistoryRes, tokenPacksRes, plansRes].filter((r) => !r.success)
+          this.subscription = normalizeSubscription(subscriptionRes.success ? subscriptionRes.data : null)
+          this.tokenBalance = normalizeTokenBalance(balanceRes.success ? balanceRes.data : null, this.subscription)
+          this.tokenUsage = normalizeTokenUsage(tokenHistoryRes.success ? ((tokenHistoryRes.data as any)?.data || tokenHistoryRes.data) : [])
+          
+          this.tokenPacks = Array.isArray((tokenPacksRes.data as any)?.data)
+            ? (tokenPacksRes.data as any).data
+            : Array.isArray(tokenPacksRes.data)
+              ? tokenPacksRes.data as TokenPack[]
+              : []
+              
+          this.paymentMethods = normalizePaymentMethods(paymentMethodsRes.success ? ((paymentMethodsRes.data as any)?.data || paymentMethodsRes.data) : [])
+          this.paymentHistory = normalizePayments(historyRes.success ? ((historyRes.data as any)?.data || historyRes.data) : [])
+          this.pricingPlans = normalizePlans(plansRes.success ? ((plansRes.data as any)?.data || plansRes.data) : [])
 
-        if (hardFailures.length) {
-          this.error = hardFailures[0]?.message || 'Unable to load required billing data.'
-        } else if (softFailures.length) {
-          this.error = 'Some billing sections are unavailable. Showing database data where available.'
+          const hardFailures = [subscriptionRes, balanceRes].filter((r) => !r.success)
+          const softFailures = [historyRes, paymentMethodsRes, tokenHistoryRes, tokenPacksRes, plansRes].filter((r) => !r.success)
+
+          if (hardFailures.length) {
+            this.error = hardFailures[0]?.message || 'Unable to load required billing data.'
+          } else if (softFailures.length) {
+            this.error = 'Some billing sections are unavailable. Showing database data where available.'
+          }
+
+          this.usingMockData = false
+          this.lastFetched = Date.now()
+        } catch (error: any) {
+          this.error = error?.message || 'Unable to load billing data.'
+        } finally {
+          this.loading = false
+          this.fetchPromise = null
         }
+      })()
 
-        this.usingMockData = false
-      } catch (error: any) {
-        this.error = error?.message || 'Unable to load billing data.'
-      } finally {
-        this.loading = false
-      }
+      return this.fetchPromise
+    },
+
+    async refreshBillingData(force = false) {
+      return this.loadBillingData(force)
+    },
+
+    async fetchBilling() {
+      return this.loadBillingData(false)
     },
 
     async buyTokenPack(packId: string) {
