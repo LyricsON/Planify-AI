@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import AIScheduleDialog from '~/components/schedule-ai/AIScheduleDialog.vue'
+
 definePageMeta({ layout: 'dashboard' })
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -27,6 +29,7 @@ const today = new Date()
 const weekStart = ref(getWeekStart(today))
 const activeFilters = ref(['course','td','tp','exam','study_session','task','break','personal','other'])
 const showQuickAdd = ref(false)
+const showAiScheduleDialog = ref(false)
 const isRegen = ref(false)
 
 function getWeekStart(d: Date) {
@@ -35,9 +38,12 @@ function getWeekStart(d: Date) {
 }
 
 const weekDays = computed(() => Array.from({length:7},(_,i)=>{ const d=new Date(weekStart.value); d.setDate(d.getDate()+i); return d }))
+const weekStartIso = computed(() => weekStart.value.toISOString())
+const weekEndIso = computed(() => new Date(weekStart.value.getTime() + 7 * 86400000).toISOString())
 
 const weekRange = computed(() => {
-  const s = weekDays.value[0], e = weekDays.value[6]
+  const s = weekDays.value[0] ?? weekStart.value
+  const e = weekDays.value[6] ?? weekStart.value
   return `${s.getDate()} – ${e.toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})}`
 })
 
@@ -65,7 +71,7 @@ onMounted(() => {
     if (calCardRef.value) {
       sidebarH.value = calCardRef.value.offsetHeight
       ro = new ResizeObserver(entries => {
-        sidebarH.value = entries[0].contentRect.height
+        sidebarH.value = entries[0]?.contentRect.height || calCardRef.value?.offsetHeight || 0
       })
       ro.observe(calCardRef.value)
     }
@@ -87,7 +93,7 @@ const typeMap: Record<string,{bg:string;border:string;text:string;dot:string;lab
   personal:      {bg:'bg-pink-50',   border:'border-pink-200',   text:'text-pink-700',   dot:'bg-pink-500',   label:'Personal'},
   other:         {bg:'bg-slate-50',  border:'border-slate-200',  text:'text-slate-600',  dot:'bg-slate-400',  label:'Other'},
 }
-const tc = (t:string) => typeMap[t] || typeMap.other
+const tc = (t:string): { bg:string; border:string; text:string; dot:string; label:string } => typeMap[t] ?? typeMap.other!
 
 // Filter chips use the actual API type values
 const chips = ['course','td','tp','exam','study_session','task','break','personal']
@@ -97,7 +103,7 @@ const toggleFilter = (t:string) => { const i=activeFilters.value.indexOf(t); i>-
 const showTypeDropdown = ref(false)
 const selectedTypeLabel = computed(() => {
   if (activeFilters.value.length === chips.length) return 'All Types'
-  if (activeFilters.value.length === 1) return tc(activeFilters.value[0]).label
+  if (activeFilters.value.length === 1) return tc(activeFilters.value[0] || 'other').label
   return `${activeFilters.value.length} Types`
 })
 function selectType(type: string | null) {
@@ -229,7 +235,14 @@ import ScheduleInsightsGrid from '~/components/schedule/ScheduleInsightsGrid.vue
       </div>
 
       <!-- Right col: Quick Add (above the sidebar) -->
-      <div class="flex items-center justify-end xl:justify-end">
+      <div class="flex flex-wrap items-center justify-end gap-2 xl:justify-end">
+        <button
+          class="flex items-center gap-2 px-4 py-2 text-[13px] font-bold text-white rounded-xl bg-indigo-600 hover:bg-indigo-700 transition shadow-sm shadow-indigo-200"
+          @click="showAiScheduleDialog = true"
+        >
+          <UIcon name="i-lucide-sparkles" class="size-4"/>
+          Generate with AI
+        </button>
         <button class="flex items-center gap-2 px-4 py-2 text-[13px] font-bold text-white rounded-xl bg-indigo-600 hover:bg-indigo-700 transition shadow-sm shadow-indigo-200" @click="showQuickAdd=true">
           <UIcon name="i-lucide-plus" class="size-4"/>Quick Add
         </button>
@@ -443,8 +456,8 @@ import ScheduleInsightsGrid from '~/components/schedule/ScheduleInsightsGrid.vue
 
                 <!-- Time column -->
                 <div class="w-[44px] pt-0.5 text-right">
-                  <p class="text-[11px] font-bold text-slate-700 leading-tight agenda-card">{{ fmtRange(ev.start,ev.end).split('–')[0].trim() }}</p>
-                  <p class="text-[10px] text-slate-400 leading-tight agenda-card">{{ fmtRange(ev.start,ev.end).split('–')[1]?.trim() }}</p>
+                  <p class="text-[11px] font-bold text-slate-700 leading-tight agenda-card">{{ (() => { const [startLabel] = fmtRange(ev.start, ev.end).split('–'); return (startLabel || '').trim() })() }}</p>
+                  <p class="text-[10px] text-slate-400 leading-tight agenda-card">{{ (() => { const [, endLabel] = fmtRange(ev.start, ev.end).split('–'); return (endLabel || '').trim() })() }}</p>
                 </div>
 
                 <!-- Timeline column: dot + vertical connector line -->
@@ -476,6 +489,13 @@ import ScheduleInsightsGrid from '~/components/schedule/ScheduleInsightsGrid.vue
 
     <!-- Bottom Analytics Section -->
     <ScheduleInsightsGrid :events="filtered" />
+
+    <AIScheduleDialog
+      v-model:open="showAiScheduleDialog"
+      :week-start="weekStartIso"
+      :week-end="weekEndIso"
+      @generated="fetchWeekEvents"
+    />
 
     <!-- Quick Add Modal -->
     <div v-if="showQuickAdd" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" @click.self="showQuickAdd=false">
