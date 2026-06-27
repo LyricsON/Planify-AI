@@ -1,11 +1,11 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { ref, computed, onMounted, nextTick } from 'vue'
 
 definePageMeta({
   layout: 'dashboard'
 })
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+// ââ Types âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 interface Course {
   _id: string
   title: string
@@ -30,15 +30,43 @@ interface AIMessage {
   id: string
   sender: 'user' | 'assistant'
   timestamp: string
-  type: 'chat' | 'summary' | 'exercises' | 'daily_plan'
+  type: 'chat' | 'exam' | 'summary' | 'exercises' | 'daily_plan' | 'flashcards' | 'revision_plan' | 'prioritize_tasks'
   text?: string
+  examData?: {
+    title: string
+    subject: string
+    level: string
+    instructions: string
+    durationMinutes: number
+    questions: Array<{
+      id: number | string | null
+      type: 'mcq' | 'open' | 'short_answer' | 'true_false'
+      question: string
+      options?: string[]
+      answer?: string
+      explanation?: string
+    }>
+    answerKey?: Array<{
+      id: number | string
+      answer: string
+      explanation?: string
+    }>
+    nextActions?: string[]
+    followUpQuestion?: string
+    confidence?: string
+    responseType?: string
+  }
   summaryData?: {
     summary: string
     keyPoints: string[]
+    topics?: string[]
+    studyTips?: string[]
+    nextSteps?: string[]
     wordCount?: number
     readingTime?: string
   }
   exercisesData?: {
+    courseTitle: string
     topic: string
     difficulty: string
     exercises: Array<{
@@ -47,42 +75,100 @@ interface AIMessage {
       type: 'open' | 'mcq' | 'coding'
       options?: string[]
       answer?: string
+      explanation?: string
       hint?: string
       language?: string
     }>
   }
   planData?: {
     date: string
+    focusHours: number
     totalStudyHours: number
+    overview?: string
     plan: Array<{
       time: string
       subject: string
       activity: string
       priority: 'high' | 'medium' | 'low'
+      title?: string
     }>
     tip?: string
   }
+  flashcardsData?: {
+    title: string
+    topic: string
+    cards: Array<{
+      id: number
+      front: string
+      back: string
+      hint?: string
+    }>
+    reviewTips?: string[]
+  }
+  revisionPlanData?: {
+    title: string
+    summary: string
+    topicBreakdown: Array<{
+      topic: string
+      priority: 'high' | 'medium' | 'low'
+      focus: string
+      timeEstimate: string
+    }>
+    plan: Array<{
+      day: string
+      focus: string
+      tasks: string[]
+    }>
+    practiceIdeas: string[]
+    examTips: string[]
+  }
+  priorityData?: {
+    summary: string
+    ranking: Array<{
+      taskId: string
+      title: string
+      score: number
+      reason: string
+      suggestedAction: string
+    }>
+    focusTips: string[]
+  }
   tokensUsed?: number
   isGenerating?: boolean
+  responseType?: string
 }
 
-// ── Composables ───────────────────────────────────────────────────────────────
+interface AIConversation {
+  conversationId: string
+  conversationTitle: string
+  lastUserMessage?: string
+  lastMessage?: string
+  lastType?: string
+  lastCreatedAt?: string
+  count?: number
+}
+
+// ââ Composables âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 const { get, post } = useApi()
 const router = useRouter()
 
-// ── State ─────────────────────────────────────────────────────────────────────
+// ââ State âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 const currentUser = ref<any>(null)
 const courses = ref<Course[]>([])
 const files = ref<FileItem[]>([])
 const tokenBalance = ref<number>(10000)
-const aiHistory = ref<any[]>([])
+const aiHistory = ref<AIConversation[]>([])
 
 const isLoadingPage = ref(true)
 const loadError = ref('')
+const isLoadingConversation = ref(false)
 
 // Selected contexts
 const selectedCourseId = ref<string>('')
 const selectedFileId = ref<string>('')
+const currentConversationId = ref<string>('')
+const currentConversationTitle = ref<string>('New chat')
+const showAllConversations = ref(false)
 
 // Form state
 const chatMessage = ref('')
@@ -112,9 +198,12 @@ const planForm = ref({
 // UI Toggles
 const revealedAnswers = ref<Record<string, boolean>>({})
 const revealedHints = ref<Record<string, boolean>>({})
+const revealedExplanations = ref<Record<string, boolean>>({})
 const thumbsFeedback = ref<Record<string, 'up' | 'down'>>({})
+const examDraftAnswers = ref<Record<string, string>>({})
+const revealedExamAnswers = ref<Record<string, boolean>>({})
 
-// ── Computed Properties ───────────────────────────────────────────────────────
+// ââ Computed Properties âââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 const activeCourse = computed<Course | null>(() => {
   if (selectedCourseId.value) {
     return courses.value.find(c => c._id === selectedCourseId.value) || null
@@ -137,7 +226,19 @@ const currentCostLabel = computed(() => {
   return '300 tokens per prompt'
 })
 
-// ── Ref helper for scrolling ──────────────────────────────────────────────────
+const visibleConversations = computed(() => {
+  if (showAllConversations.value) return aiHistory.value
+  return aiHistory.value.slice(0, 4)
+})
+
+function createConversationId() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  return `conv_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
+}
+
+// ââ Ref helper for scrolling ââââââââââââââââââââââââââââââââââââââââââââââââââ
 const chatFeedRef = ref<HTMLDivElement | null>(null)
 
 function scrollToBottom() {
@@ -148,7 +249,7 @@ function scrollToBottom() {
   })
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ââ Helpers âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 function formatFileSize(bytes?: number): string {
   if (!bytes) return '0 B'
   const k = 1024
@@ -182,12 +283,93 @@ function copyToClipboard(text: string) {
   }
 }
 
+function examQuestionKey(messageId: string, questionId: string | number | null, index: number) {
+  return `${messageId}::${questionId ?? index}`
+}
+
+function optionLabel(index: number) {
+  return String.fromCharCode(65 + index)
+}
+
+function questionAnswerText(question: any, examData?: AIMessage['examData']) {
+  const direct = typeof question?.answer === 'string' ? question.answer.trim() : ''
+  if (direct) return direct
+  if (!examData?.answerKey) return ''
+  const match = examData.answerKey.find((item) => String(item.id) === String(question?.id))
+  return typeof match?.answer === 'string' ? match.answer : ''
+}
+
+function copyMessageText(msg: AIMessage) {
+  if (msg.type === 'exam' && msg.examData) {
+    const lines = [
+      msg.examData.title,
+      msg.examData.instructions,
+      ...msg.examData.questions.map((question, index) => {
+        const options = Array.isArray(question.options) && question.options.length
+          ? ` Options: ${question.options.join(' | ')}`
+          : ''
+        return `${index + 1}. ${question.question}${options}`
+      }),
+    ].filter(Boolean)
+    return lines.join('\n')
+  }
+
+  if (msg.type === 'summary' && msg.summaryData) {
+    return [msg.summaryData.summary, ...(msg.summaryData.keyPoints || [])].filter(Boolean).join('\n')
+  }
+
+  if (msg.type === 'exercises' && msg.exercisesData) {
+    return msg.exercisesData.exercises.map((exercise, index) => `${index + 1}. ${exercise.question}`).join('\n')
+  }
+
+  if (msg.type === 'flashcards' && msg.flashcardsData) {
+    return msg.flashcardsData.cards.map((card, index) => `${index + 1}. ${card.front} -> ${card.back}`).join('\n')
+  }
+
+  if (msg.type === 'revision_plan' && msg.revisionPlanData) {
+    return [msg.revisionPlanData.title, msg.revisionPlanData.summary].filter(Boolean).join('\n')
+  }
+
+  if (msg.type === 'prioritize_tasks' && msg.priorityData) {
+    return msg.priorityData.ranking.map((item, index) => `${index + 1}. ${item.title} (${item.score})`).join('\n')
+  }
+
+  if (msg.type === 'daily_plan' && msg.planData) {
+    return [msg.planData.overview, ...msg.planData.plan.map((item) => `${item.time} - ${item.subject}: ${item.activity}`)].filter(Boolean).join('\n')
+  }
+
+  return msg.text || ''
+}
+
 function safeParseJson(value: unknown) {
   if (typeof value !== 'string') return null
 
   try {
     return JSON.parse(value)
   } catch {
+    const trimmed = value.trim()
+    const firstObject = trimmed.indexOf('{')
+    const lastObject = trimmed.lastIndexOf('}')
+
+    if (firstObject >= 0 && lastObject > firstObject) {
+      try {
+        return JSON.parse(trimmed.slice(firstObject, lastObject + 1))
+      } catch {
+        // fall through
+      }
+    }
+
+    const firstArray = trimmed.indexOf('[')
+    const lastArray = trimmed.lastIndexOf(']')
+
+    if (firstArray >= 0 && lastArray > firstArray) {
+      try {
+        return JSON.parse(trimmed.slice(firstArray, lastArray + 1))
+      } catch {
+        // fall through
+      }
+    }
+
     return null
   }
 }
@@ -196,9 +378,27 @@ function extractPlainText(value: unknown): string {
   if (typeof value === 'string') return value
   if (value && typeof value === 'object') {
     const record = value as Record<string, any>
-    return record.reply || record.text || record.message || record.summary || ''
+    if (Array.isArray(record.questions) && typeof record.title === 'string') {
+      return `Exam: ${record.title}`
+    }
+    if (Array.isArray(record.cards) && typeof record.title === 'string') {
+      return `Flashcards: ${record.title}`
+    }
+    if (Array.isArray(record.topicBreakdown) && typeof record.title === 'string') {
+      return `Revision plan: ${record.title}`
+    }
+    if (Array.isArray(record.ranking) && typeof record.summary === 'string') {
+      return record.summary
+    }
+    return record.assistantMessage || record.reply || record.text || record.message || record.summary || record.overview || record.title || ''
   }
   return ''
+}
+
+function normalizeConversationTitle(value: unknown): string {
+  const text = typeof value === 'string' ? value.trim() : ''
+  if (!text) return 'New chat'
+  return text.length > 54 ? `${text.slice(0, 51).trimEnd()}…` : text
 }
 
 function normalizeChatReply(value: unknown): string {
@@ -209,45 +409,90 @@ function normalizeChatReply(value: unknown): string {
   return extractPlainText(value)
 }
 
-function normalizePromptText(item: any): string {
-  const fallback = item?.metadata?.historyPrompt || item?.prompt || ''
-  if (item?.metadata?.historyPrompt) return item.metadata.historyPrompt
-
-  const parsedPrompt = safeParseJson(item?.prompt)
-  if (!parsedPrompt) return fallback
-
-  if (item.type === 'daily_plan') {
-    return `Create a study plan for ${parsedPrompt.date || 'today'} with ${parsedPrompt.focusHours || 6} focus hours.`
+function unwrapAssistantPayload(value: unknown, depth = 0): Record<string, any> {
+  if (!value || typeof value !== 'object' || Array.isArray(value) || depth > 3) {
+    return {}
   }
 
-  if (item.type === 'exercises') {
-    return `Generate ${parsedPrompt.count || 3} practice exercises on topic "${parsedPrompt.topic || 'General'}".`
+  const current = value as Record<string, any>
+  const directKeys = ['responseType', 'exam', 'summary', 'exercises', 'flashcards', 'dailyPlan', 'revisionPlan', 'prioritizedTasks', 'plan', 'question', 'cards', 'ranking', 'questions']
+  if (directKeys.some((key) => key in current)) {
+    return current
   }
 
-  if (item.type === 'summary' || item.type === 'summarize_file') {
-    return 'Summarize the selected study material.'
+  const wrapperKeys = ['data', 'chat', 'response', 'payload', 'result']
+  for (const key of wrapperKeys) {
+    const nested = current[key]
+    if (nested && typeof nested === 'object') {
+      const unwrapped = unwrapAssistantPayload(nested, depth + 1)
+      if (Object.keys(unwrapped).length) {
+        return unwrapped
+      }
+    }
   }
 
-  if (item.type === 'prioritize_tasks') {
-    return 'Prioritize my current tasks.'
-  }
+  return current
+}
 
-  if (item.type === 'revision_plan') {
-    return 'Create a revision plan for my course or exam.'
-  }
+function normalizeExamResponse(value: unknown): AIMessage['examData'] {
+  const parsed = safeParseJson(value)
+  const raw = unwrapAssistantPayload(
+    parsed && typeof parsed === 'object'
+      ? parsed
+      : value && typeof value === 'object'
+        ? value
+        : {}
+  )
+  const data = raw.exam && typeof raw.exam === 'object' ? raw.exam as Record<string, any> : raw
+  const questions = Array.isArray(data.questions) ? data.questions : []
+  const answerKey = Array.isArray(data.answerKey) ? data.answerKey : []
 
-  return fallback
+  return {
+    title: typeof data.title === 'string' && data.title.trim() ? data.title.trim() : 'Exam',
+    subject: typeof data.subject === 'string' && data.subject.trim() ? data.subject.trim() : 'General Studies',
+    level: typeof data.level === 'string' && data.level.trim() ? data.level.trim() : 'medium',
+    instructions: typeof data.instructions === 'string' && data.instructions.trim() ? data.instructions.trim() : 'Answer the questions carefully.',
+    durationMinutes: Number.isFinite(Number(data.durationMinutes || data.estimatedDurationMinutes)) ? Number(data.durationMinutes || data.estimatedDurationMinutes) : 20,
+    questions: questions.map((item: any, index: number) => {
+      const questionType = (['mcq', 'open', 'short_answer', 'true_false'].includes(String(item?.type || '').toLowerCase())
+        ? String(item.type).toLowerCase()
+        : 'open') as 'mcq' | 'open' | 'short_answer' | 'true_false'
+      const answerItem = answerKey[index]
+
+      return {
+        id: item?.id ?? index + 1,
+        type: questionType,
+        question: typeof item?.question === 'string' ? item.question : 'Question',
+        options: Array.isArray(item?.options) ? item.options.filter((option: unknown) => typeof option === 'string' && option.trim()) : [],
+        answer: typeof item?.answer === 'string' && item.answer.trim() ? item.answer : (typeof answerItem?.answer === 'string' ? answerItem.answer : ''),
+        explanation: typeof item?.explanation === 'string' && item.explanation.trim() ? item.explanation : (typeof answerItem?.explanation === 'string' ? answerItem.explanation : ''),
+      }
+    }) as NonNullable<AIMessage['examData']>['questions'],
+    answerKey: answerKey.map((item: any, index: number) => ({
+      id: item?.id ?? index + 1,
+      answer: typeof item?.answer === 'string' ? item.answer : '',
+      explanation: typeof item?.explanation === 'string' ? item.explanation : '',
+    })),
+    nextActions: Array.isArray(data.nextActions) ? data.nextActions.filter((item: unknown) => typeof item === 'string' && item.trim()) : [],
+    followUpQuestion: typeof data.followUpQuestion === 'string' ? data.followUpQuestion : '',
+    confidence: typeof data.confidence === 'string' ? data.confidence : '',
+    responseType: typeof data.responseType === 'string' ? data.responseType : 'exam',
+  }
 }
 
 function normalizeSummaryResponse(value: unknown) {
   const parsed = safeParseJson(value)
-  if (parsed && typeof parsed === 'object') {
+  const raw = unwrapAssistantPayload(parsed && typeof parsed === 'object' ? parsed : value)
+  if (Object.keys(raw).length) {
     return {
-      title: parsed.title || 'Summary',
-      summary: parsed.summary || extractPlainText(parsed) || '',
-      keyPoints: Array.isArray(parsed.keyPoints) ? parsed.keyPoints : [],
-      wordCount: typeof parsed.wordCount === 'number' ? parsed.wordCount : undefined,
-      readingTime: parsed.readingTime || undefined
+      title: typeof raw.title === 'string' && raw.title.trim() ? raw.title.trim() : 'Summary',
+      summary: typeof raw.summary === 'string' && raw.summary.trim() ? raw.summary.trim() : extractPlainText(raw),
+      keyPoints: Array.isArray(raw.keyPoints) ? raw.keyPoints.filter((item: unknown) => typeof item === 'string' && item.trim()) : [],
+      topics: Array.isArray(raw.topics) ? raw.topics.filter((item: unknown) => typeof item === 'string' && item.trim()) : [],
+      studyTips: Array.isArray(raw.studyTips) ? raw.studyTips.filter((item: unknown) => typeof item === 'string' && item.trim()) : [],
+      nextSteps: Array.isArray(raw.nextSteps) ? raw.nextSteps.filter((item: unknown) => typeof item === 'string' && item.trim()) : [],
+      wordCount: typeof raw.wordCount === 'number' ? raw.wordCount : undefined,
+      readingTime: raw.readingTime || undefined
     }
   }
 
@@ -255,17 +500,44 @@ function normalizeSummaryResponse(value: unknown) {
     title: 'Summary',
     summary: extractPlainText(value),
     keyPoints: [],
+    topics: [],
+    studyTips: [],
+    nextSteps: [],
   }
 }
 
 function normalizeExercisesResponse(value: unknown) {
   const parsed = safeParseJson(value)
-  if (parsed && typeof parsed === 'object') {
+  const raw = unwrapAssistantPayload(
+    parsed && typeof parsed === 'object'
+      ? parsed
+      : value && typeof value === 'object'
+        ? value
+        : {}
+  )
+  const data = raw.exercises && typeof raw.exercises === 'object' && !Array.isArray(raw.exercises)
+    ? raw.exercises as Record<string, any>
+    : raw
+
+  if (data && typeof data === 'object') {
+    const courseTitle = typeof data.courseTitle === 'string' && data.courseTitle.trim()
+      ? data.courseTitle.trim()
+      : typeof raw.courseTitle === 'string' && raw.courseTitle.trim()
+        ? raw.courseTitle.trim()
+        : 'Course'
+    const topic = typeof data.topic === 'string' && data.topic.trim()
+      ? data.topic.trim()
+      : typeof raw.topic === 'string' && raw.topic.trim()
+        ? raw.topic.trim()
+        : courseTitle !== 'Course'
+          ? courseTitle
+          : 'General'
+
     return {
-      courseTitle: parsed.courseTitle || 'Course',
-      topic: parsed.topic || 'General',
-      difficulty: parsed.difficulty || 'medium',
-      exercises: Array.isArray(parsed.exercises) ? parsed.exercises : []
+      courseTitle,
+      topic,
+      difficulty: typeof data.difficulty === 'string' && data.difficulty.trim() ? data.difficulty.trim() : 'medium',
+      exercises: Array.isArray(data.exercises) ? data.exercises : []
     }
   }
 
@@ -279,14 +551,15 @@ function normalizeExercisesResponse(value: unknown) {
 
 function normalizePlanResponse(value: unknown) {
   const parsed = safeParseJson(value)
-  if (parsed && typeof parsed === 'object') {
+  const raw = unwrapAssistantPayload(parsed && typeof parsed === 'object' ? parsed : value)
+  if (Object.keys(raw).length) {
     return {
-      date: parsed.date || '',
-      focusHours: parsed.focusHours || parsed.totalStudyHours || 0,
-      totalStudyHours: parsed.totalStudyHours || parsed.focusHours || 0,
-      plan: Array.isArray(parsed.plan) ? parsed.plan : [],
-      tip: parsed.tip || (Array.isArray(parsed.tips) ? parsed.tips[0] : ''),
-      overview: parsed.overview || ''
+      date: typeof raw.date === 'string' ? raw.date : '',
+      focusHours: Number.isFinite(Number(raw.focusHours)) ? Number(raw.focusHours) : Number(raw.totalStudyHours) || 0,
+      totalStudyHours: Number.isFinite(Number(raw.totalStudyHours)) ? Number(raw.totalStudyHours) : Number(raw.focusHours) || 0,
+      plan: Array.isArray(raw.plan) ? raw.plan : [],
+      tip: typeof raw.tip === 'string' ? raw.tip : (Array.isArray(raw.tips) ? raw.tips[0] : ''),
+      overview: typeof raw.overview === 'string' ? raw.overview : ''
     }
   }
 
@@ -298,6 +571,239 @@ function normalizePlanResponse(value: unknown) {
     tip: extractPlainText(value),
     overview: ''
   }
+}
+
+function normalizeFlashcardsResponse(value: unknown) {
+  const parsed = safeParseJson(value)
+  const raw = unwrapAssistantPayload(parsed && typeof parsed === 'object' ? parsed : value)
+  if (Object.keys(raw).length) {
+    const cardsRaw = Array.isArray(raw.cards) ? raw.cards : Array.isArray(raw.flashcards) ? raw.flashcards : []
+    return {
+      title: typeof raw.title === 'string' && raw.title.trim() ? raw.title.trim() : `Flashcards for ${typeof raw.topic === 'string' && raw.topic.trim() ? raw.topic.trim() : 'the topic'}`,
+      topic: typeof raw.topic === 'string' && raw.topic.trim() ? raw.topic.trim() : 'General',
+      cards: cardsRaw.map((item: any, index: number) => ({
+        id: Number.isFinite(Number(item?.id)) ? Number(item.id) : index + 1,
+        front: typeof item?.front === 'string' && item.front.trim() ? item.front.trim() : typeof item?.question === 'string' ? item.question : '',
+        back: typeof item?.back === 'string' && item.back.trim() ? item.back.trim() : typeof item?.answer === 'string' ? item.answer : '',
+        hint: typeof item?.hint === 'string' ? item.hint : '',
+      })).filter((card: any) => card.front || card.back),
+      reviewTips: Array.isArray(raw.reviewTips) ? raw.reviewTips.filter((item: unknown) => typeof item === 'string' && item.trim()) : [],
+    }
+  }
+
+  return {
+    title: 'Flashcards',
+    topic: 'General',
+    cards: [],
+    reviewTips: [],
+  }
+}
+
+function normalizeRevisionPlanResponse(value: unknown) {
+  const parsed = safeParseJson(value)
+  const raw = unwrapAssistantPayload(parsed && typeof parsed === 'object' ? parsed : value)
+  if (Object.keys(raw).length) {
+    return {
+      title: typeof raw.title === 'string' && raw.title.trim() ? raw.title.trim() : 'Revision plan',
+      summary: typeof raw.summary === 'string' && raw.summary.trim() ? raw.summary.trim() : extractPlainText(raw),
+      topicBreakdown: Array.isArray(raw.topicBreakdown) ? raw.topicBreakdown : [],
+      plan: Array.isArray(raw.plan) ? raw.plan : [],
+      practiceIdeas: Array.isArray(raw.practiceIdeas) ? raw.practiceIdeas.filter((item: unknown) => typeof item === 'string' && item.trim()) : [],
+      examTips: Array.isArray(raw.examTips) ? raw.examTips.filter((item: unknown) => typeof item === 'string' && item.trim()) : [],
+    }
+  }
+
+  return {
+    title: 'Revision plan',
+    summary: extractPlainText(value),
+    topicBreakdown: [],
+    plan: [],
+    practiceIdeas: [],
+    examTips: [],
+  }
+}
+
+function normalizePrioritizedTasksResponse(value: unknown) {
+  const parsed = safeParseJson(value)
+  const raw = unwrapAssistantPayload(parsed && typeof parsed === 'object' ? parsed : value)
+  if (Object.keys(raw).length) {
+    return {
+      summary: typeof raw.summary === 'string' && raw.summary.trim() ? raw.summary.trim() : extractPlainText(raw),
+      ranking: Array.isArray(raw.ranking) ? raw.ranking : [],
+      focusTips: Array.isArray(raw.focusTips) ? raw.focusTips.filter((item: unknown) => typeof item === 'string' && item.trim()) : [],
+    }
+  }
+
+  return {
+    summary: extractPlainText(value),
+    ranking: [],
+    focusTips: [],
+  }
+}
+
+function normalizeAssistantType(value: unknown): AIMessage['type'] {
+  const type = typeof value === 'string' ? value.trim().toLowerCase() : ''
+  switch (type) {
+    case 'exam':
+      return 'exam'
+    case 'summary':
+      return 'summary'
+    case 'exercises':
+    case 'exercise':
+      return 'exercises'
+    case 'flashcards':
+    case 'flashcard':
+      return 'flashcards'
+    case 'daily_plan':
+    case 'daily-plan':
+    case 'study_plan':
+    case 'study plan':
+      return 'daily_plan'
+    case 'revision_plan':
+    case 'revision-plan':
+    case 'roadmap':
+      return 'revision_plan'
+    case 'prioritize_tasks':
+    case 'prioritize-task':
+      return 'prioritize_tasks'
+    default:
+      return 'chat'
+  }
+}
+
+function normalizeAssistantPayload(responseType: unknown, payload: unknown, fallbackText = '') {
+  const type = normalizeAssistantType(responseType)
+  const parsed = safeParseJson(payload)
+  const raw = unwrapAssistantPayload(
+    parsed && typeof parsed === 'object'
+      ? parsed
+      : payload && typeof payload === 'object'
+        ? payload
+        : {}
+  )
+
+  switch (type) {
+    case 'exam':
+      return {
+        type,
+        examData: normalizeExamResponse(raw.exam || raw),
+        text: fallbackText || extractPlainText(raw) || '',
+      }
+    case 'summary':
+      return {
+        type,
+        summaryData: normalizeSummaryResponse(raw.summary || raw),
+        text: fallbackText || extractPlainText(raw) || '',
+      }
+    case 'exercises':
+      return {
+        type,
+        exercisesData: normalizeExercisesResponse(raw),
+        text: fallbackText || extractPlainText(raw) || '',
+      }
+    case 'flashcards':
+      return {
+        type,
+        flashcardsData: normalizeFlashcardsResponse(raw.flashcards || raw),
+        text: fallbackText || extractPlainText(raw) || '',
+      }
+    case 'daily_plan':
+      return {
+        type,
+        planData: normalizePlanResponse(raw.dailyPlan || raw),
+        text: fallbackText || extractPlainText(raw) || '',
+      }
+    case 'revision_plan':
+      return {
+        type,
+        revisionPlanData: normalizeRevisionPlanResponse(raw.revisionPlan || raw),
+        text: fallbackText || extractPlainText(raw) || '',
+      }
+    case 'prioritize_tasks':
+      return {
+        type,
+        priorityData: normalizePrioritizedTasksResponse(raw.prioritizedTasks || raw),
+        text: fallbackText || extractPlainText(raw) || '',
+      }
+    default:
+      if (raw && typeof raw === 'object') {
+        if (raw.exam && typeof raw.exam === 'object') {
+          return {
+            type: 'exam' as const,
+            examData: normalizeExamResponse(raw.exam),
+            text: fallbackText || extractPlainText(raw) || '',
+          }
+        }
+        if (raw.summary && typeof raw.summary === 'object') {
+          return {
+            type: 'summary' as const,
+            summaryData: normalizeSummaryResponse(raw.summary),
+            text: fallbackText || extractPlainText(raw) || '',
+          }
+        }
+        if (raw.exercises && typeof raw.exercises === 'object') {
+          return {
+            type: 'exercises' as const,
+            exercisesData: normalizeExercisesResponse(raw),
+            text: fallbackText || extractPlainText(raw) || '',
+          }
+        }
+        if (raw.flashcards && typeof raw.flashcards === 'object') {
+          return {
+            type: 'flashcards' as const,
+            flashcardsData: normalizeFlashcardsResponse(raw.flashcards),
+            text: fallbackText || extractPlainText(raw) || '',
+          }
+        }
+        if (raw.revisionPlan && typeof raw.revisionPlan === 'object') {
+          return {
+            type: 'revision_plan' as const,
+            revisionPlanData: normalizeRevisionPlanResponse(raw.revisionPlan),
+            text: fallbackText || extractPlainText(raw) || '',
+          }
+        }
+        if (raw.prioritizedTasks && typeof raw.prioritizedTasks === 'object') {
+          return {
+            type: 'prioritize_tasks' as const,
+            priorityData: normalizePrioritizedTasksResponse(raw.prioritizedTasks),
+            text: fallbackText || extractPlainText(raw) || '',
+          }
+        }
+        if (raw.dailyPlan && typeof raw.dailyPlan === 'object') {
+          return {
+            type: 'daily_plan' as const,
+            planData: normalizePlanResponse(raw.dailyPlan),
+            text: fallbackText || extractPlainText(raw) || '',
+          }
+        }
+      }
+
+      return {
+        type: 'chat' as const,
+        text: normalizeChatReply(raw.assistantMessage || raw.reply || raw.message || raw.text || fallbackText || raw),
+      }
+  }
+}
+function normalizePromptText(item: any): string {
+  const original = typeof item?.originalUserMessage === 'string' ? item.originalUserMessage.trim() : ''
+  if (original) return original
+
+  const fallback = typeof item?.prompt === 'string' ? item.prompt.trim() : ''
+  if (fallback) return fallback
+
+  return typeof item?.metadata?.historyPrompt === 'string' ? item.metadata.historyPrompt.trim() : ''
+}
+
+function normalizeConversationList(items: any[]): AIConversation[] {
+  return (Array.isArray(items) ? items : []).map((item) => ({
+    conversationId: item.conversationId || item._id || createConversationId(),
+    conversationTitle: normalizeConversationTitle(item.conversationTitle || item.lastUserMessage || item.prompt),
+    lastUserMessage: extractPlainText(item.lastUserMessage || item.originalUserMessage || item.prompt),
+    lastMessage: extractPlainText(item.lastMessage || item.assistantMessage || item.response),
+    lastType: item.lastType || item.metadata?.responseType || item.responseType || item.type || 'chat',
+    lastCreatedAt: item.lastCreatedAt || item.updatedAt || item.createdAt,
+    count: typeof item.count === 'number' ? item.count : undefined,
+  }))
 }
 
 function extractAssistantText(msg: AIMessage): string {
@@ -318,6 +824,25 @@ function extractAssistantText(msg: AIMessage): string {
     return msg.planData.overview || msg.planData.tip || 'Daily study plan generated.'
   }
 
+  if (msg.type === 'flashcards' && msg.flashcardsData) {
+    return msg.flashcardsData.cards?.[0]?.front || msg.flashcardsData.title || 'Flashcards generated.'
+  }
+
+  if (msg.type === 'revision_plan' && msg.revisionPlanData) {
+    return msg.revisionPlanData.summary || msg.revisionPlanData.title || 'Revision plan generated.'
+  }
+
+  if (msg.type === 'prioritize_tasks' && msg.priorityData) {
+    return msg.priorityData.summary || 'Tasks prioritized.'
+  }
+
+  if (msg.type === 'exam' && msg.examData) {
+    const firstQuestion = msg.examData.questions?.[0]?.question
+    return firstQuestion
+      ? `Exam: ${msg.examData.subject}. ${firstQuestion}`
+      : `Exam: ${msg.examData.subject}.`
+  }
+
   return msg.text || ''
 }
 
@@ -333,7 +858,7 @@ function buildRecentConversation(maxItems = 8) {
     .filter((msg) => msg.content.length > 0)
 }
 
-// ── Backend AI History Parser ─────────────────────────────────────────────────
+// ââ Backend AI History Parser âââââââââââââââââââââââââââââââââââââââââââââââââ
 function parseAIHistory(historyData: any[]): AIMessage[] {
   const msgs: AIMessage[] = []
   // Sort chronologically (oldest first)
@@ -356,24 +881,37 @@ function parseAIHistory(historyData: any[]): AIMessage[] {
       id: `${item._id}_assistant`,
       sender: 'assistant',
       timestamp: formatTime(item.createdAt),
-      type: item.type,
+      type: normalizeAssistantType(item.metadata?.responseType || item.responseType || item.type),
       tokensUsed: item.tokensUsed
     }
 
     try {
-      if (item.type === 'summary') {
-        assistantMsg.summaryData = normalizeSummaryResponse(item.response)
-      } else if (item.type === 'exercises') {
-        assistantMsg.exercisesData = normalizeExercisesResponse(item.response)
-      } else if (item.type === 'daily_plan') {
-        assistantMsg.planData = normalizePlanResponse(item.response)
-      } else if (item.type === 'chat') {
-        assistantMsg.text = normalizeChatReply(item.response)
-      } else if (item.type === 'prioritize_tasks' || item.type === 'revision_plan' || item.type === 'dashboard_recommendations') {
-        const parsed = safeParseJson(item.response)
-        assistantMsg.text = extractPlainText(parsed) || extractPlainText(item.response)
+      const normalized = normalizeAssistantPayload(
+        item.metadata?.responseType || item.responseType || item.type,
+        item.chat || item.exam || item.response,
+        normalizeChatReply(item.assistantMessage || item.response)
+      )
+
+      assistantMsg.type = normalized.type
+      assistantMsg.text = normalized.text
+      assistantMsg.responseType = normalizeAssistantType(item.metadata?.responseType || item.responseType || item.type)
+
+      if (normalized.type === 'summary' && normalized.summaryData) {
+        assistantMsg.summaryData = normalized.summaryData
+      } else if (normalized.type === 'exercises' && normalized.exercisesData) {
+        assistantMsg.exercisesData = normalized.exercisesData
+      } else if (normalized.type === 'daily_plan' && normalized.planData) {
+        assistantMsg.planData = normalized.planData
+      } else if (normalized.type === 'flashcards' && normalized.flashcardsData) {
+        assistantMsg.flashcardsData = normalized.flashcardsData
+      } else if (normalized.type === 'revision_plan' && normalized.revisionPlanData) {
+        assistantMsg.revisionPlanData = normalized.revisionPlanData
+      } else if (normalized.type === 'prioritize_tasks' && normalized.priorityData) {
+        assistantMsg.priorityData = normalized.priorityData
+      } else if (normalized.type === 'exam' && normalized.examData) {
+        assistantMsg.examData = normalized.examData
       } else {
-        assistantMsg.text = extractPlainText(item.response)
+        assistantMsg.text = assistantMsg.text || extractPlainText(item.response)
       }
     } catch {
       assistantMsg.text = extractPlainText(item.response)
@@ -385,7 +923,39 @@ function parseAIHistory(historyData: any[]): AIMessage[] {
   return msgs
 }
 
-// ── Load Page Data ────────────────────────────────────────────────────────────
+// ââ Load Page Data ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+async function loadConversationList() {
+  const conversationRes = await get<any>('/ai/conversations?limit=30')
+  if (conversationRes.success && conversationRes.data) {
+    aiHistory.value = normalizeConversationList(conversationRes.data.data || conversationRes.data)
+  }
+}
+
+async function loadConversationThread(conversationId: string) {
+  if (!conversationId) return
+
+  isLoadingConversation.value = true
+  try {
+    const res = await get<any>(`/ai/history?conversationId=${encodeURIComponent(conversationId)}`)
+    if (res.success && Array.isArray(res.data)) {
+      currentConversationId.value = conversationId
+      aiMessages.value = parseAIHistory(res.data)
+      currentConversationTitle.value = aiHistory.value.find((item) => item.conversationId === conversationId)?.conversationTitle || currentConversationTitle.value
+      scrollToBottom()
+    }
+  } finally {
+    isLoadingConversation.value = false
+  }
+}
+
+function startNewConversation() {
+  currentConversationId.value = createConversationId()
+  currentConversationTitle.value = 'New chat'
+  aiMessages.value = []
+  chatMessage.value = ''
+  scrollToBottom()
+}
+
 async function loadData() {
   isLoadingPage.value = true
   loadError.value = ''
@@ -404,7 +974,7 @@ async function loadData() {
       get<any>('/courses'),
       get<any>('/files?limit=10'),
       get<any>('/tokens/balance'),
-      get<any>('/ai/history?limit=10')
+      get<any>('/ai/conversations?limit=30')
     ])
 
     if (meRes.success) currentUser.value = meRes.data
@@ -418,15 +988,14 @@ async function loadData() {
       tokenBalance.value = tokenRes.data.tokenBalance
     }
     if (historyRes.success && historyRes.data) {
-      aiHistory.value = historyRes.data
-      aiMessages.value = parseAIHistory(historyRes.data)
+      aiHistory.value = normalizeConversationList(historyRes.data.data || historyRes.data)
     }
 
     // Set initial course context
     if (courses.value.length > 0 && !selectedCourseId.value && courses.value[0]) {
       selectedCourseId.value = courses.value[0]._id
     }
-    
+    startNewConversation()
     scrollToBottom()
   } catch (err: any) {
     loadError.value = err?.message || 'Error connecting to the server.'
@@ -440,14 +1009,20 @@ async function refreshBalanceAndHistory() {
   try {
     const [tokenRes, historyRes] = await Promise.all([
       get<any>('/tokens/balance'),
-      get<any>('/ai/history?limit=10')
+      get<any>('/ai/conversations?limit=30')
     ])
     if (tokenRes.success && tokenRes.data) {
       tokenBalance.value = tokenRes.data.tokenBalance
     }
     if (historyRes.success && historyRes.data) {
-      aiHistory.value = historyRes.data
-      aiMessages.value = parseAIHistory(historyRes.data)
+      aiHistory.value = normalizeConversationList(historyRes.data.data || historyRes.data)
+      const activeThread = currentConversationId.value
+      if (activeThread) {
+        const conversationRes = await get<any>(`/ai/history?conversationId=${encodeURIComponent(activeThread)}`)
+        if (conversationRes.success && Array.isArray(conversationRes.data)) {
+          aiMessages.value = parseAIHistory(conversationRes.data)
+        }
+      }
     }
     scrollToBottom()
   } catch (e) {
@@ -455,7 +1030,7 @@ async function refreshBalanceAndHistory() {
   }
 }
 
-// ── API Handlers ──────────────────────────────────────────────────────────────
+// ââ API Handlers ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 async function sendChatMessage() {
   if (!chatMessage.value.trim() || isSending.value) return
 
@@ -488,7 +1063,7 @@ async function sendChatMessage() {
   scrollToBottom()
 
   try {
-    const payload: Record<string, any> = { message: userMsgText }
+    const payload: Record<string, any> = { message: userMsgText, conversationId: currentConversationId.value }
     if (selectedCourseId.value) {
       payload.courseId = selectedCourseId.value
     }
@@ -505,13 +1080,32 @@ async function sendChatMessage() {
     aiMessages.value = aiMessages.value.filter(m => m.id !== tempAssistantMsgId)
 
     if (res.success && res.data) {
-      const replyText = normalizeChatReply(res.data.reply || res.data.message || res.data.chat)
+      if (res.data.conversationId) {
+        currentConversationId.value = res.data.conversationId
+      }
+      if (res.data.conversationTitle) {
+        currentConversationTitle.value = res.data.conversationTitle
+      }
+      const responseType = normalizeAssistantType(res.data.responseType || res.data.metadata?.responseType || res.data.chat?.responseType || res.data.chat?.type || 'chat')
+      const normalized = normalizeAssistantPayload(
+        responseType,
+        res.data.chat || res.data,
+        res.data.assistantMessage || res.data.reply || res.data.message || ''
+      )
       aiMessages.value.push({
         id: 'msg_ai_' + Date.now(),
         sender: 'assistant',
         timestamp: formatTime(new Date().toISOString()),
-        type: 'chat',
-        text: replyText,
+        type: normalized.type,
+        text: normalized.text,
+        examData: normalized.examData,
+        summaryData: normalized.summaryData,
+        exercisesData: normalized.exercisesData,
+        planData: normalized.planData,
+        flashcardsData: normalized.flashcardsData,
+        revisionPlanData: normalized.revisionPlanData,
+        priorityData: normalized.priorityData,
+        responseType: normalized.type,
         tokensUsed: res.data.tokensUsed
       })
       await refreshBalanceAndHistory()
@@ -539,7 +1133,7 @@ async function sendChatMessage() {
   }
 }
 
-// ── Quick Actions Trigger Functions ───────────────────────────────────────────
+// ââ Quick Actions Trigger Functions âââââââââââââââââââââââââââââââââââââââââââ
 
 // Action: Generate Exercises
 async function handleGenerateExercisesAction() {
@@ -575,7 +1169,8 @@ async function handleGenerateExercisesAction() {
       courseId: selectedCourseId.value || undefined,
       topic: topicText,
       difficulty: difficultyVal,
-      count: countVal
+      count: countVal,
+      conversationId: currentConversationId.value
     })
 
     aiMessages.value = aiMessages.value.filter(m => m.id !== tempAssistantMsgId)
@@ -645,7 +1240,8 @@ async function handleSummarizeAction() {
     const res = await post<any>('/ai/summarize', {
       fileId: fileIdVal,
       courseId: selectedCourseId.value || undefined,
-      text: textVal
+      text: textVal,
+      conversationId: currentConversationId.value
     })
 
     aiMessages.value = aiMessages.value.filter(m => m.id !== tempAssistantMsgId)
@@ -716,7 +1312,8 @@ async function handleDailyPlanAction() {
     const res = await post<any>('/ai/daily-plan', {
       courseIds: courseIdsVal,
       focusHours: hoursVal,
-      date: dateVal
+      date: dateVal,
+      conversationId: currentConversationId.value
     })
 
     aiMessages.value = aiMessages.value.filter(m => m.id !== tempAssistantMsgId)
@@ -755,7 +1352,7 @@ async function handleDailyPlanAction() {
   }
 }
 
-// ── Follow up actions on response context ─────────────────────────────────────
+// ââ Follow up actions on response context âââââââââââââââââââââââââââââââââââââ
 async function handleExplainDeeper(parentMsg: AIMessage) {
   let promptText = ''
   if (parentMsg.type === 'summary' && parentMsg.summaryData) {
@@ -808,24 +1405,20 @@ function handleSaveToNotes() {
 }
 
 function selectHistoryOutput(historyItem: any) {
-  // Populate the active chat view with this history item by scrolling to it or adding it to messages focus
-  // Since we already loaded full history chronologically, we can just look up the message id in the feed and scroll to it
-  const matchId = `${historyItem._id}_assistant`
-  const element = document.getElementById(matchId)
-  if (element) {
-    element.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    element.classList.add('highlight-output')
-    setTimeout(() => {
-      element.classList.remove('highlight-output')
-    }, 2000)
-  } else {
-    // If not found in current messages, refresh feed
-    loadData()
+  if (historyItem?.conversationId) {
+    loadConversationThread(historyItem.conversationId)
+    return
   }
+
+  loadData()
 }
 
 function selectActiveCourse(courseId: string) {
   selectedCourseId.value = courseId
+}
+
+function toggleConversationList() {
+  showAllConversations.value = !showAllConversations.value
 }
 
 onMounted(() => {
@@ -855,9 +1448,18 @@ onMounted(() => {
     <!-- Main Grid Content -->
     <div v-else class="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
       
-      <!-- ─── LEFT COLUMN: CHAT CARD ─── -->
+      <!-- âââ LEFT COLUMN: CHAT CARD âââ -->
       <div class="lg:col-span-2 flex flex-col gap-6">
-        <div class="chat-card bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl shadow-[0_4px_20px_-4px_rgba(15,23,42,0.03)] flex flex-col h-[780px]">
+        <div class="chat-card rounded-[16px] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--shadow-card)] flex flex-col h-[780px]">
+          <div class="flex items-center justify-between gap-3 px-6 pt-5 pb-3 border-b border-slate-100 dark:border-slate-800">
+            <div>
+              <p class="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--color-text-muted)]">Conversation</p>
+              <h3 class="text-[14px] font-semibold text-[var(--color-text)] mt-1">{{ currentConversationTitle }}</h3>
+            </div>
+            <button @click="startNewConversation" class="text-[11px] font-bold px-3 py-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-soft)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] transition-colors">
+              New chat
+            </button>
+          </div>
           
           <!-- Greeting Intro (Visible when message history is empty) -->
           <div v-if="aiMessages.length === 0" class="p-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/20 rounded-t-2xl">
@@ -866,10 +1468,10 @@ onMounted(() => {
                 <UIcon name="i-lucide-sparkles" class="size-5" />
               </div>
               <div class="flex-1">
-                <h2 class="text-base font-bold text-slate-800 dark:text-slate-100">
+                <h2 class="text-[15px] font-bold text-[var(--color-text)]">
                   Hi {{ currentUser?.name || 'Student' }}! I'm your AI study assistant.
                 </h2>
-                <p class="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+                <p class="text-[13px] text-[var(--color-text-muted)] mt-1 leading-relaxed">
                   I can help you understand concepts, create study plans, generate exercises, and keep you on track.
                 </p>
                 
@@ -905,8 +1507,8 @@ onMounted(() => {
                 <UIcon name="i-lucide-sparkles" class="size-4" />
               </div>
               <div class="flex-1">
-                <h3 class="text-sm font-bold text-slate-800 dark:text-slate-100">AI Study Assistant</h3>
-                <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                <h3 class="text-[14px] font-bold text-[var(--color-text)]">AI Study Assistant</h3>
+                <p class="text-[13px] text-[var(--color-text-muted)] mt-1">
                   Ready to support your studies. You can use the quick actions below to generate structures instantly:
                 </p>
                 <div class="flex flex-wrap items-center gap-2 mt-3">
@@ -937,7 +1539,7 @@ onMounted(() => {
               <div v-if="msg.sender === 'user'" class="flex items-start justify-end gap-3 max-w-[85%] ml-auto">
                 <div class="flex flex-col items-end">
                   <span class="text-[10px] text-slate-400 mb-1">{{ msg.timestamp }}</span>
-                  <div class="user-bubble bg-[#f5f4fd] dark:bg-indigo-950/40 border border-indigo-50/50 dark:border-indigo-900/20 text-slate-800 dark:text-slate-200 rounded-2xl rounded-tr-none px-4.5 py-3 text-sm shadow-sm">
+                  <div class="user-bubble bg-[color-mix(in_srgb,var(--color-primary)_8%,white)] dark:bg-indigo-950/40 border border-[var(--color-border)] text-[13px] leading-relaxed text-[var(--color-text)] rounded-2xl rounded-tr-none px-4 py-3 shadow-[var(--shadow-sm)]">
                     {{ msg.text }}
                   </div>
                 </div>
@@ -958,7 +1560,7 @@ onMounted(() => {
                 <div class="flex-1 min-w-0">
                   <span class="text-[10px] text-slate-400 mb-1 block">{{ msg.timestamp }}</span>
                   
-                  <div class="ai-bubble bg-white dark:bg-slate-900 border border-slate-150 dark:border-slate-800 text-slate-850 dark:text-slate-200 rounded-2xl rounded-tl-none p-5 shadow-[0_2px_12px_rgba(15,23,42,0.02)]">
+                  <div class="ai-bubble rounded-2xl rounded-tl-none p-5 border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text)] shadow-[var(--shadow-sm)]">
                     
                     <!-- Loading typing indicator -->
                     <div v-if="msg.isGenerating" class="typing-indicator flex items-center gap-1.5 py-1">
@@ -968,8 +1570,139 @@ onMounted(() => {
                     </div>
 
                     <!-- Type: Standard Chat Response -->
-                    <div v-else-if="msg.type === 'chat'" class="whitespace-pre-line text-sm leading-relaxed">
-                      {{ msg.text }}
+                    <div v-else-if="msg.type === 'chat'" class="space-y-2">
+                      <div v-if="msg.responseType && msg.responseType !== 'chat'" class="text-[10px] font-bold uppercase tracking-[0.16em] text-indigo-500 dark:text-indigo-300">
+                        {{ msg.responseType.replace(/_/g, ' ') }}
+                      </div>
+                      <div class="whitespace-pre-line text-[13px] leading-relaxed">
+                        {{ msg.text }}
+                      </div>
+                    </div>
+
+                    <!-- Type: Exam Output -->
+                    <div v-else-if="msg.type === 'exam' && msg.examData" class="space-y-4">
+                      <div class="rounded-2xl border border-violet-100 dark:border-violet-950/60 bg-gradient-to-br from-violet-50 via-white to-indigo-50 dark:from-violet-950/25 dark:via-slate-950 dark:to-slate-900 p-4">
+                        <div class="flex flex-wrap items-start justify-between gap-3">
+                          <div class="space-y-2">
+                            <div class="inline-flex items-center gap-1.5 rounded-full border border-violet-200/70 bg-white/80 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-violet-600 dark:border-violet-900/60 dark:bg-slate-950/70 dark:text-violet-300">
+                              <UIcon name="i-lucide-clipboard-list" class="size-3.5" />
+                              Professional exam
+                            </div>
+                            <h4 class="text-base font-extrabold text-slate-900 dark:text-slate-100 leading-tight">
+                              {{ msg.examData.title }}
+                            </h4>
+                            <p class="max-w-3xl text-xs leading-relaxed text-slate-600 dark:text-slate-300 whitespace-pre-line">
+                              {{ msg.examData.instructions }}
+                            </p>
+                          </div>
+
+                          <div class="grid grid-cols-2 gap-2 text-[10px] font-semibold text-slate-600 dark:text-slate-300">
+                            <div class="rounded-xl border border-white/70 bg-white/70 dark:border-slate-800 dark:bg-slate-950/80 px-3 py-2">
+                              <div class="uppercase tracking-[0.16em] text-slate-400 dark:text-slate-500">Topic</div>
+                              <div class="mt-0.5 text-slate-800 dark:text-slate-100">{{ msg.examData.subject }}</div>
+                            </div>
+                            <div class="rounded-xl border border-white/70 bg-white/70 dark:border-slate-800 dark:bg-slate-950/80 px-3 py-2">
+                              <div class="uppercase tracking-[0.16em] text-slate-400 dark:text-slate-500">Difficulty</div>
+                              <div class="mt-0.5 text-slate-800 dark:text-slate-100">{{ msg.examData.level }}</div>
+                            </div>
+                            <div class="rounded-xl border border-white/70 bg-white/70 dark:border-slate-800 dark:bg-slate-950/80 px-3 py-2">
+                              <div class="uppercase tracking-[0.16em] text-slate-400 dark:text-slate-500">Duration</div>
+                              <div class="mt-0.5 text-slate-800 dark:text-slate-100">{{ msg.examData.durationMinutes }} min</div>
+                            </div>
+                            <div class="rounded-xl border border-white/70 bg-white/70 dark:border-slate-800 dark:bg-slate-950/80 px-3 py-2">
+                              <div class="uppercase tracking-[0.16em] text-slate-400 dark:text-slate-500">Questions</div>
+                              <div class="mt-0.5 text-slate-800 dark:text-slate-100">{{ msg.examData.questions.length }}</div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div class="space-y-3">
+                        <div v-for="(question, idx) in msg.examData.questions" :key="question.id ?? idx" class="rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/20 p-4 shadow-[0_1px_0_rgba(15,23,42,0.02)]">
+                          <div class="flex items-start justify-between gap-3">
+                            <div class="space-y-1.5">
+                              <div class="inline-flex items-center gap-1.5 rounded-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+                                Q{{ idx + 1 }}
+                                <span class="text-slate-300">•</span>
+                                {{ question.type.replace('_', ' ') }}
+                              </div>
+                              <p class="text-sm font-semibold text-slate-900 dark:text-slate-100 leading-snug">
+                                {{ question.question }}
+                              </p>
+                            </div>
+                            <span v-if="questionAnswerText(question, msg.examData)" class="rounded-full bg-violet-50 dark:bg-violet-950/35 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-violet-600 dark:text-violet-300">
+                              Answer ready
+                            </span>
+                          </div>
+
+                          <div v-if="question.type === 'mcq' && question.options?.length" class="grid grid-cols-1 md:grid-cols-2 gap-2 mt-4">
+                            <button
+                              v-for="(option, optionIdx) in question.options"
+                              :key="option"
+                              type="button"
+                              class="text-left rounded-xl border px-3.5 py-3 bg-white dark:bg-slate-900/90 leading-snug transition-all"
+                              :class="examDraftAnswers[examQuestionKey(msg.id, question.id, idx)] === option ? 'border-violet-500 bg-violet-50/70 text-slate-900 dark:bg-violet-950/30 dark:border-violet-700' : 'border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-violet-300 dark:hover:border-violet-700/60'"
+                              @click="examDraftAnswers[examQuestionKey(msg.id, question.id, idx)] = option"
+                            >
+                              <div class="flex items-start gap-3">
+                                <span class="inline-flex size-6 flex-shrink-0 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-[10px] font-extrabold text-slate-600 dark:text-slate-300">
+                                  {{ optionLabel(optionIdx) }}
+                                </span>
+                                <span class="text-[11px] font-medium">
+                                  {{ option }}
+                                </span>
+                              </div>
+                            </button>
+                          </div>
+
+                          <div v-else class="mt-4">
+                            <textarea
+                              v-model="examDraftAnswers[examQuestionKey(msg.id, question.id, idx)]"
+                              rows="3"
+                              class="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-2.5 text-[12px] text-slate-700 dark:text-slate-300 focus:outline-none focus:border-violet-500/60 resize-none"
+                              placeholder="Write your answer here..."
+                            />
+                          </div>
+
+                          <div class="flex flex-wrap items-center gap-2 mt-4 pt-3 border-t border-slate-200/70 dark:border-slate-800/70">
+                            <button
+                              type="button"
+                              class="text-[10px] font-semibold text-violet-600 dark:text-violet-300 hover:underline"
+                              @click="revealedExamAnswers[examQuestionKey(msg.id, question.id, idx)] = !revealedExamAnswers[examQuestionKey(msg.id, question.id, idx)]"
+                            >
+                              {{ revealedExamAnswers[examQuestionKey(msg.id, question.id, idx)] ? 'Hide correction' : 'Show correction' }}
+                            </button>
+                            <span v-if="examDraftAnswers[examQuestionKey(msg.id, question.id, idx)]" class="text-[10px] text-slate-500 dark:text-slate-400">
+                              Your answer saved
+                            </span>
+                          </div>
+
+                          <div v-if="revealedExamAnswers[examQuestionKey(msg.id, question.id, idx)] && questionAnswerText(question, msg.examData)" class="mt-3 rounded-xl border border-emerald-100/70 dark:border-emerald-900/40 bg-emerald-50/50 dark:bg-emerald-950/20 p-3 text-[11px] leading-relaxed text-emerald-900 dark:text-emerald-200">
+                            <div class="font-bold uppercase tracking-[0.16em] text-[10px] mb-1.5">Correct answer</div>
+                            <div>{{ questionAnswerText(question, msg.examData) }}</div>
+                          </div>
+
+                          <div v-if="revealedExamAnswers[examQuestionKey(msg.id, question.id, idx)] && question.explanation" class="mt-2.5 rounded-xl border border-slate-100 dark:border-slate-800 bg-white/90 dark:bg-slate-900/60 p-3 text-[11px] leading-relaxed text-slate-600 dark:text-slate-300">
+                            <div class="font-bold uppercase tracking-[0.16em] text-[10px] mb-1.5">Explanation</div>
+                            <div>{{ question.explanation }}</div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div v-if="msg.examData.nextActions?.length" class="flex flex-wrap items-center gap-2">
+                        <button
+                          v-for="action in msg.examData.nextActions"
+                          :key="action"
+                          type="button"
+                          class="rounded-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-1.5 text-[10px] font-semibold text-slate-600 dark:text-slate-300 hover:border-violet-300 hover:text-violet-600 dark:hover:border-violet-700/60 dark:hover:text-violet-300"
+                        >
+                          {{ action }}
+                        </button>
+                      </div>
+
+                      <div v-if="msg.examData.followUpQuestion" class="rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/20 px-3 py-2.5 text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                        {{ msg.examData.followUpQuestion }}
+                      </div>
                     </div>
 
                     <!-- Type: Summarized Output -->
@@ -1011,7 +1744,14 @@ onMounted(() => {
                         </span>
                       </div>
                       
-                      <p class="text-xs text-slate-500 dark:text-slate-400">Topic: <strong class="text-slate-700 dark:text-slate-200">{{ msg.exercisesData.topic }}</strong></p>
+                      <div class="space-y-1 text-xs text-slate-500 dark:text-slate-400">
+                        <p>
+                          Course: <strong class="text-slate-700 dark:text-slate-200">{{ msg.exercisesData.courseTitle }}</strong>
+                        </p>
+                        <p>
+                          Topic: <strong class="text-slate-700 dark:text-slate-200">{{ msg.exercisesData.topic }}</strong>
+                        </p>
+                      </div>
 
                       <div class="space-y-4 mt-3">
                         <div v-for="(ex, idx) in msg.exercisesData.exercises" :key="ex.id" class="exercise-item border border-slate-100 dark:border-slate-800/80 rounded-xl p-3.5 bg-slate-50/20 dark:bg-slate-950/10">
@@ -1019,8 +1759,8 @@ onMounted(() => {
                             {{ idx + 1 }}. {{ ex.question }}
                           </p>
 
-                          <!-- MCQ Options -->
-                          <div v-if="ex.type === 'mcq' && ex.options" class="grid grid-cols-1 md:grid-cols-2 gap-2 mt-3">
+                          <!-- Options -->
+                          <div v-if="Array.isArray(ex.options) && ex.options.length" class="grid grid-cols-1 md:grid-cols-2 gap-2 mt-3">
                             <label v-for="option in ex.options" :key="option" class="mcq-option flex items-center gap-2 border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-lg p-2.5 cursor-pointer text-xs transition-colors hover:bg-slate-50 dark:hover:bg-slate-800">
                               <input type="radio" :name="'ex_radio_' + ex.id" class="accent-indigo-600" />
                               <span class="text-slate-700 dark:text-slate-350">{{ option }}</span>
@@ -1054,6 +1794,11 @@ onMounted(() => {
                           <!-- Answer content -->
                           <div v-if="revealedAnswers[msg.id + '_' + ex.id]" class="mt-2.5 text-[11px] bg-emerald-50/40 text-emerald-850 dark:bg-emerald-950/20 dark:text-emerald-300 p-2.5 rounded-lg border border-emerald-100/50 dark:border-emerald-900/30">
                             <strong>Correct Answer:</strong> {{ ex.answer }}
+                          </div>
+
+                          <!-- Explanation content -->
+                          <div v-if="revealedAnswers[msg.id + '_' + ex.id] && ex.explanation" class="mt-2.5 text-[11px] bg-violet-50/40 text-violet-850 dark:bg-violet-950/20 dark:text-violet-300 p-2.5 rounded-lg border border-violet-100/50 dark:border-violet-900/30">
+                            <strong>Explanation:</strong> {{ ex.explanation }}
                           </div>
                         </div>
                       </div>
@@ -1096,6 +1841,153 @@ onMounted(() => {
                       </div>
                     </div>
 
+                    <!-- Type: Flashcards Output -->
+                    <div v-else-if="msg.type === 'flashcards' && msg.flashcardsData" class="space-y-4">
+                      <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2.5">
+                        <h4 class="text-sm font-bold text-slate-850 dark:text-slate-100 flex items-center gap-1.5">
+                          <UIcon name="i-lucide-layers-3" class="text-fuchsia-500 size-4" />
+                          Flashcards
+                        </h4>
+                        <span class="text-[10px] font-bold uppercase tracking-[0.16em] text-fuchsia-500 dark:text-fuchsia-300">
+                          {{ msg.flashcardsData.cards.length }} cards
+                        </span>
+                      </div>
+
+                      <div class="rounded-2xl border border-fuchsia-100 dark:border-fuchsia-950/50 bg-fuchsia-50/40 dark:bg-fuchsia-950/10 p-4">
+                        <p class="text-sm font-semibold text-slate-900 dark:text-slate-100">{{ msg.flashcardsData.title }}</p>
+                        <p class="text-xs text-slate-600 dark:text-slate-300 mt-1">Topic: {{ msg.flashcardsData.topic }}</p>
+                      </div>
+
+                      <div class="grid gap-3 md:grid-cols-2">
+                        <div v-for="card in msg.flashcardsData.cards" :key="card.id" class="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-3">
+                          <div class="flex items-center justify-between">
+                            <span class="text-[10px] font-bold uppercase tracking-[0.16em] text-fuchsia-500 dark:text-fuchsia-300">Card {{ card.id }}</span>
+                            <span class="text-[10px] text-slate-400 dark:text-slate-500">Tap to review</span>
+                          </div>
+                          <div class="rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/30 p-3">
+                            <div class="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400 dark:text-slate-500 mb-1">Front</div>
+                            <div class="text-sm font-medium text-slate-900 dark:text-slate-100 leading-relaxed">{{ card.front }}</div>
+                          </div>
+                          <div class="rounded-xl border border-slate-100 dark:border-slate-800 bg-emerald-50/50 dark:bg-emerald-950/15 p-3">
+                            <div class="text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-600 dark:text-emerald-300 mb-1">Back</div>
+                            <div class="text-sm leading-relaxed text-emerald-900 dark:text-emerald-200">{{ card.back }}</div>
+                          </div>
+                          <div v-if="card.hint" class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                            <strong>Hint:</strong> {{ card.hint }}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div v-if="msg.flashcardsData.reviewTips?.length" class="rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/30 p-4">
+                        <div class="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400 dark:text-slate-500 mb-2">Review tips</div>
+                        <ul class="space-y-1.5">
+                          <li v-for="tip in msg.flashcardsData.reviewTips" :key="tip" class="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
+                            {{ tip }}
+                          </li>
+                        </ul>
+                      </div>
+                    </div>
+
+                    <!-- Type: Revision Plan Output -->
+                    <div v-else-if="msg.type === 'revision_plan' && msg.revisionPlanData" class="space-y-4">
+                      <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2.5">
+                        <h4 class="text-sm font-bold text-slate-850 dark:text-slate-100 flex items-center gap-1.5">
+                          <UIcon name="i-lucide-route" class="text-indigo-500 size-4" />
+                          Revision Roadmap
+                        </h4>
+                        <span class="text-[10px] font-bold uppercase tracking-[0.16em] text-indigo-500 dark:text-indigo-300">
+                          {{ msg.revisionPlanData.plan.length }} steps
+                        </span>
+                      </div>
+
+                      <div class="rounded-2xl border border-indigo-100 dark:border-indigo-950/50 bg-indigo-50/40 dark:bg-indigo-950/10 p-4">
+                        <p class="text-sm font-semibold text-slate-900 dark:text-slate-100">{{ msg.revisionPlanData.title }}</p>
+                        <p class="text-xs text-slate-600 dark:text-slate-300 mt-1">{{ msg.revisionPlanData.summary }}</p>
+                      </div>
+
+                      <div class="space-y-3">
+                        <div v-for="(item, idx) in msg.revisionPlanData.topicBreakdown" :key="`${item.topic}-${idx}`" class="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
+                          <div class="flex items-center justify-between gap-2">
+                            <p class="text-sm font-semibold text-slate-900 dark:text-slate-100">{{ item.topic }}</p>
+                            <span class="rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em]" :class="item.priority === 'high' ? 'bg-rose-50 text-rose-600 dark:bg-rose-950/20 dark:text-rose-300' : item.priority === 'medium' ? 'bg-amber-50 text-amber-600 dark:bg-amber-950/20 dark:text-amber-300' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'">
+                              {{ item.priority }}
+                            </span>
+                          </div>
+                          <p class="mt-2 text-xs text-slate-600 dark:text-slate-300">{{ item.focus }}</p>
+                          <p class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">{{ item.timeEstimate }}</p>
+                        </div>
+                      </div>
+
+                      <div class="grid gap-3 md:grid-cols-2">
+                        <div class="rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/20 p-4">
+                          <div class="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400 dark:text-slate-500 mb-2">Practice ideas</div>
+                          <ul class="space-y-1.5">
+                            <li v-for="idea in msg.revisionPlanData.practiceIdeas" :key="idea" class="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">{{ idea }}</li>
+                          </ul>
+                        </div>
+                        <div class="rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/20 p-4">
+                          <div class="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400 dark:text-slate-500 mb-2">Exam tips</div>
+                          <ul class="space-y-1.5">
+                            <li v-for="tip in msg.revisionPlanData.examTips" :key="tip" class="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">{{ tip }}</li>
+                          </ul>
+                        </div>
+                      </div>
+
+                      <div class="space-y-2">
+                        <div v-for="step in msg.revisionPlanData.plan" :key="step.day" class="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
+                          <div class="flex items-center justify-between">
+                            <p class="text-sm font-semibold text-slate-900 dark:text-slate-100">{{ step.day }}</p>
+                            <span class="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">{{ step.focus }}</span>
+                          </div>
+                          <ul class="mt-2 space-y-1.5">
+                            <li v-for="task in step.tasks" :key="task" class="text-xs text-slate-600 dark:text-slate-300">• {{ task }}</li>
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Type: Prioritized Tasks Output -->
+                    <div v-else-if="msg.type === 'prioritize_tasks' && msg.priorityData" class="space-y-4">
+                      <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2.5">
+                        <h4 class="text-sm font-bold text-slate-850 dark:text-slate-100 flex items-center gap-1.5">
+                          <UIcon name="i-lucide-list-ordered" class="text-amber-500 size-4" />
+                          Priority Ranking
+                        </h4>
+                        <span class="text-[10px] font-bold uppercase tracking-[0.16em] text-amber-500 dark:text-amber-300">
+                          {{ msg.priorityData.ranking.length }} tasks
+                        </span>
+                      </div>
+
+                      <div class="rounded-2xl border border-amber-100 dark:border-amber-950/50 bg-amber-50/40 dark:bg-amber-950/10 p-4">
+                        <p class="text-sm font-semibold text-slate-900 dark:text-slate-100">{{ msg.priorityData.summary }}</p>
+                      </div>
+
+                      <div class="space-y-2.5">
+                        <div v-for="(item, idx) in msg.priorityData.ranking" :key="`${item.taskId}-${idx}`" class="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
+                          <div class="flex items-start justify-between gap-3">
+                            <div class="space-y-1">
+                              <div class="inline-flex items-center gap-1.5 rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+                                Rank {{ idx + 1 }}
+                              </div>
+                              <p class="text-sm font-semibold text-slate-900 dark:text-slate-100">{{ item.title }}</p>
+                            </div>
+                            <span class="rounded-full bg-amber-50 dark:bg-amber-950/20 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-amber-600 dark:text-amber-300">
+                              {{ item.score }}
+                            </span>
+                          </div>
+                          <p class="mt-2 text-xs text-slate-600 dark:text-slate-300">{{ item.reason }}</p>
+                          <p class="mt-1 text-xs font-medium text-slate-700 dark:text-slate-200">{{ item.suggestedAction }}</p>
+                        </div>
+                      </div>
+
+                      <div v-if="msg.priorityData.focusTips?.length" class="rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/20 p-4">
+                        <div class="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400 dark:text-slate-500 mb-2">Focus tips</div>
+                        <ul class="space-y-1.5">
+                          <li v-for="tip in msg.priorityData.focusTips" :key="tip" class="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">{{ tip }}</li>
+                        </ul>
+                      </div>
+                    </div>
+
                     <!-- Token cost notification -->
                     <div v-if="msg.tokensUsed" class="text-[9px] font-bold text-slate-400 uppercase text-right tracking-wide mt-3.5 select-none">
                       Cost: {{ msg.tokensUsed }} tokens deducted
@@ -1104,11 +1996,11 @@ onMounted(() => {
                   </div>
 
                   <!-- Assistant Response Actions (Feedback + Follow-ups) -->
-                  <div v-if="!msg.isGenerating" class="flex flex-col gap-2 mt-2 ml-1">
-                    
-                    <!-- Copy, Save, Explain deeper row -->
-                    <div class="flex items-center gap-2">
-                      <button @click="copyToClipboard(msg.text || msg.summaryData?.summary || 'AI Response')" class="response-action-btn" title="Copy Response">
+                    <div v-if="!msg.isGenerating" class="flex flex-col gap-2 mt-2 ml-1">
+                      
+                      <!-- Copy, Save, Explain deeper row -->
+                      <div class="flex items-center gap-2">
+                      <button @click="copyToClipboard(copyMessageText(msg) || 'AI Response')" class="response-action-btn" title="Copy Response">
                         <UIcon name="i-lucide-copy" class="size-3.5" />
                         Copy
                       </button>
@@ -1203,7 +2095,7 @@ onMounted(() => {
                 </span>
                 
                 <!-- View History -->
-                <button @click="loadData" class="flex items-center gap-1 hover:text-slate-650 dark:hover:text-slate-350">
+                <button @click="loadConversationList" class="flex items-center gap-1 hover:text-slate-650 dark:hover:text-slate-350">
                   <UIcon name="i-lucide-history" class="size-3.5" />
                   View history
                 </button>
@@ -1219,7 +2111,7 @@ onMounted(() => {
         </p>
       </div>
 
-      <!-- ─── RIGHT COLUMN: STUDY CONTEXT & TOKEN USAGE ─── -->
+      <!-- âââ RIGHT COLUMN: STUDY CONTEXT & TOKEN USAGE âââ -->
       <div class="lg:col-span-1 flex flex-col gap-6">
         
         <!-- Card 1: Your Study Context -->
@@ -1313,42 +2205,50 @@ onMounted(() => {
           </div>
         </div>
 
-        <!-- Card 3: Recent Outputs -->
-        <div class="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl p-5 shadow-[0_2px_8px_-4px_rgba(0,0,0,0.02)]">
-          <div class="flex items-center justify-between border-b border-slate-50 dark:border-slate-800 pb-3 mb-3">
-            <h3 class="text-[13px] font-bold text-slate-800 dark:text-slate-200">Recent Outputs</h3>
-            <button @click="loadData" class="text-[11px] font-bold text-[#4f46e5] dark:text-indigo-400 hover:underline">
-              View all
+        <!-- Card 3: Conversations -->
+        <div class="rounded-[16px] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-[var(--shadow-card)]">
+          <div class="flex items-center justify-between border-b border-[var(--color-border)] pb-3 mb-3">
+            <h3 class="text-[12px] font-bold text-[var(--color-text)]">Conversations</h3>
+            <button @click="startNewConversation" class="text-[10px] font-bold text-[var(--color-primary)] hover:underline">
+              New chat
             </button>
           </div>
 
           <div v-if="aiHistory.length > 0" class="space-y-2">
             <div
-              v-for="item in aiHistory.slice(0, 4)"
-              :key="item._id"
+              v-for="item in visibleConversations"
+              :key="item.conversationId"
               @click="selectHistoryOutput(item)"
-              class="recent-output-item flex items-center gap-3 p-2.5 rounded-xl border border-slate-50/50 dark:border-slate-800 bg-slate-50/10 dark:bg-slate-950/10 cursor-pointer hover:border-indigo-100 dark:hover:border-indigo-900/30 hover:bg-slate-50/40 dark:hover:bg-slate-900/40 transition-all"
+              class="recent-output-item flex items-start gap-2.5 rounded-[12px] border p-2.5 cursor-pointer transition-all"
+              :class="currentConversationId === item.conversationId ? 'border-[var(--color-primary)]/30 bg-[color-mix(in_srgb,var(--color-primary)_6%,var(--color-surface))]' : 'border-[var(--color-border)] bg-[var(--color-surface)] hover:border-[var(--color-primary)]/20 hover:shadow-[var(--shadow-sm)]'"
             >
-              <div class="recent-output-icon size-[32px] flex items-center justify-center rounded-lg"
-                :class="item.type === 'summary' ? 'bg-indigo-50 text-indigo-650 dark:bg-indigo-950/20' : item.type === 'exercises' ? 'bg-sky-50 text-sky-650 dark:bg-sky-950/20' : item.type === 'daily_plan' ? 'bg-emerald-50 text-emerald-650 dark:bg-emerald-950/20' : 'bg-amber-50 text-amber-650 dark:bg-amber-950/20'"
-              >
-                <UIcon :name="item.type === 'summary' ? 'i-lucide-file-text' : item.type === 'exercises' ? 'i-lucide-pencil' : item.type === 'daily_plan' ? 'i-lucide-calendar' : 'i-lucide-message-square'" class="size-4" />
+              <div class="recent-output-icon size-[28px] flex items-center justify-center rounded-lg bg-[color-mix(in_srgb,var(--color-primary)_10%,white)] text-[var(--color-primary)] dark:bg-indigo-950/20 dark:text-indigo-300">
+                <UIcon name="i-lucide-message-square" class="size-3.5" />
               </div>
               <div class="flex-1 min-w-0">
-                <h4 class="text-xs font-bold text-slate-700 dark:text-slate-250 truncate capitalize">
-                  {{ item.type === 'summary' ? 'Course Summary' : item.type === 'exercises' ? 'Practice Exercises' : item.type === 'daily_plan' ? 'Study Plan' : 'Chat Assistance' }}
+                <h4 class="text-[12px] font-semibold text-[var(--color-text)] truncate leading-snug">
+                  {{ item.conversationTitle }}
                 </h4>
-                <p class="text-[9px] text-slate-400 dark:text-slate-500 font-semibold mt-0.5 flex items-center gap-1">
-                  <span>{{ item.courseId?.title || 'General' }}</span>
+                <p class="mt-0.5 text-[10px] text-[var(--color-text-muted)] line-clamp-2 leading-snug">
+                  {{ item.lastUserMessage || 'Open this conversation' }}
+                </p>
+                <p class="mt-1 flex items-center gap-1 text-[9px] font-semibold text-[var(--color-text-muted)]">
+                  <span class="capitalize">{{ item.lastType || 'Conversation' }}</span>
                   <span>•</span>
-                  <span>{{ formatRelativeTime(item.createdAt) }}</span>
+                  <span>{{ formatRelativeTime(item.lastCreatedAt) }}</span>
                 </p>
               </div>
             </div>
           </div>
 
-          <div v-else class="text-xs text-slate-400 text-center py-6">
+          <div v-else class="text-[11px] text-[var(--color-text-muted)] text-center py-6">
             No recent AI outputs yet.
+          </div>
+
+          <div v-if="aiHistory.length > 4" class="pt-3 mt-3 border-t border-[var(--color-border)]">
+            <button @click="toggleConversationList" class="text-[10px] font-bold text-[var(--color-primary)] hover:underline">
+              {{ showAllConversations ? 'Show less' : 'Show more' }}
+            </button>
           </div>
         </div>
 
@@ -1356,7 +2256,7 @@ onMounted(() => {
 
     </div>
 
-    <!-- ── MODAL: GENERATE EXERCISES ────────────────────────────────────────── -->
+    <!-- ââ MODAL: GENERATE EXERCISES ââââââââââââââââââââââââââââââââââââââââââ -->
     <div v-if="showExerciseModal" class="modal-overlay" @click.self="showExerciseModal = false">
       <div class="modal-box p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-md w-full shadow-floating">
         <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3 mb-4">
@@ -1402,7 +2302,7 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- ── MODAL: SUMMARIZE MATERIAL ────────────────────────────────────────── -->
+    <!-- ââ MODAL: SUMMARIZE MATERIAL ââââââââââââââââââââââââââââââââââââââââââ -->
     <div v-if="showSummaryModal" class="modal-overlay" @click.self="showSummaryModal = false">
       <div class="modal-box p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-md w-full shadow-floating">
         <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3 mb-4">
@@ -1443,7 +2343,7 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- ── MODAL: CREATE STUDY PLAN ─────────────────────────────────────────── -->
+    <!-- ââ MODAL: CREATE STUDY PLAN âââââââââââââââââââââââââââââââââââââââââââ -->
     <div v-if="showPlanModal" class="modal-overlay" @click.self="showPlanModal = false">
       <div class="modal-box p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-md w-full shadow-floating">
         <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3 mb-4">
@@ -1483,7 +2383,7 @@ onMounted(() => {
 </template>
 
 <style scoped>
-/* ── Page Header Styles (matches tasks.vue structure) ────────────────────────── */
+/* ââ Page Header Styles (matches tasks.vue structure) ââââââââââââââââââââââââââ */
 .page-header-row {
   display: flex;
   justify-content: space-between;
@@ -1522,7 +2422,7 @@ onMounted(() => {
   font-weight: 500;
 }
 
-/* ── Chat Styling ───────────────────────────────────────────────────────────── */
+/* ââ Chat Styling âââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ */
 .quick-action-btn {
   display: flex;
   align-items: center;
@@ -1684,7 +2584,7 @@ onMounted(() => {
   cursor: pointer;
 }
 
-/* ── Animation: Typing pulse ────────────────────────────────────────────────── */
+/* ââ Animation: Typing pulse ââââââââââââââââââââââââââââââââââââââââââââââââââ */
 .typing-indicator .dot {
   display: inline-block;
   width: 5px;
