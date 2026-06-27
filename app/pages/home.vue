@@ -1,5 +1,5 @@
 <script setup lang="ts">
-definePageMeta({
-  redirect: '/dashboard'
-})
+const { isAuthenticated } = useAuth()
+
+await navigateTo(isAuthenticated() ? '/dashboard' : '/auth/signin')
 </script>

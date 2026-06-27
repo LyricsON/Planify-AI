@@ -109,11 +109,28 @@ function normalizePaymentMethods(items: unknown): PaymentMethod[] {
 
   return items.map((method: any, index: number) => ({
     id: String(method?._id || method?.id || `method-${index + 1}`),
+    _id: method?._id ? String(method._id) : undefined,
     brand: String(method?.brand || 'Card'),
+    last4: method?.last4 ? String(method.last4) : undefined,
+    expMonth: method?.expMonth ? Number(method.expMonth) : undefined,
+    expYear: method?.expYear ? Number(method.expYear) : undefined,
     label: String(method?.label || 'Saved card'),
     expiry: String(method?.expiry || 'N/A'),
-    isDefault: Boolean(method?.isDefault)
+    isDefault: Boolean(method?.isDefault),
+    stripePaymentMethodId: method?.stripePaymentMethodId ? String(method.stripePaymentMethodId) : undefined
   }))
+}
+
+function extractListData<T = unknown>(payload: any): T[] {
+  if (Array.isArray(payload?.data)) {
+    return payload.data as T[]
+  }
+
+  if (Array.isArray(payload)) {
+    return payload as T[]
+  }
+
+  return []
 }
 
 function normalizePlans(items: unknown): PricingPlan[] {
@@ -146,6 +163,9 @@ export const useBillingStore = defineStore('billing', {
   }),
   actions: {
     async loadBillingData(force = false) {
+      if (this.loading && this.fetchPromise) {
+        return this.fetchPromise
+      }
       if (this.fetchPromise) {
         return this.fetchPromise
       }
@@ -223,6 +243,64 @@ export const useBillingStore = defineStore('billing', {
       return this.loadBillingData(false)
     },
 
+    async refreshPaymentMethods(): Promise<PaymentMethod[] | null> {
+      const api = useApi()
+      try {
+        const response = await api.get<any>('/payments/methods')
+        if (!response.success) {
+          return null
+        }
+
+        const rawData = extractListData(response.data)
+        const methods = normalizePaymentMethods(rawData)
+        this.paymentMethods = methods
+        return methods
+      } catch (err) {
+        console.error('[Billing Store] Failed to refresh payment methods:', err)
+        return null
+      }
+    },
+
+    async verifyStripeSetupSession(sessionId: string): Promise<{ stripePaymentMethodId: string } | null> {
+      const api = useApi()
+      try {
+        const response = await api.post<any>('/payments/verify-setup-session', { sessionId })
+        if (!response.success) {
+          return null
+        }
+
+        const stripePaymentMethodId = String(response.data?.stripePaymentMethodId || '')
+        if (!stripePaymentMethodId) {
+          return null
+        }
+
+        return {
+          stripePaymentMethodId
+        }
+      } catch (err) {
+        console.error('[Billing Store] Failed to verify Stripe setup session:', err)
+        return null
+      }
+    },
+
+    async ensureStripePaymentMethod(sessionId: string, maxAttempts = 5, delayMs = 1500): Promise<PaymentMethod[] | null> {
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        const verifiedSession = await this.verifyStripeSetupSession(sessionId)
+        if (verifiedSession?.stripePaymentMethodId) {
+          const methods = await this.refreshPaymentMethods()
+          if (methods?.some(method => method.stripePaymentMethodId === verifiedSession.stripePaymentMethodId)) {
+            return methods
+          }
+        }
+
+        if (attempt < maxAttempts - 1) {
+          await new Promise((resolve) => setTimeout(resolve, delayMs))
+        }
+      }
+
+      return null
+    },
+
     async buyTokenPack(packId: string) {
       const pack = this.tokenPacks.find(item => item.id === packId)
       if (!pack) {
@@ -232,10 +310,7 @@ export const useBillingStore = defineStore('billing', {
 
       const api = useApi()
       const paymentRes = await api.post('/payments/demo', {
-        amount: pack.price,
-        type: 'token_pack',
-        description: `${pack.name} (${pack.tokens.toLocaleString()} tokens)`,
-        tokenAmount: pack.tokens
+        packId: pack.id
       })
 
       if (!paymentRes.success) {
@@ -263,11 +338,21 @@ export const useBillingStore = defineStore('billing', {
       return response.success
     },
 
-    async addPaymentMethod(payload: { brand: string, label: string, expiry: string }) {
+    async getStripeSetupSession() {
       const api = useApi()
-      const response = await api.post('/payments/methods', payload)
+      const response = await api.post<any>('/payments/setup-session')
       if (!response.success) {
-        this.error = response.message || 'Unable to add payment method.'
+        this.error = response.message || 'Unable to start card addition.'
+        return null
+      }
+      return response.data?.url || (response as any).url || null
+    },
+
+    async setPlanDefaultPaymentMethod(id: string) {
+      const api = useApi()
+      const response = await api.post<any>('/payments/set-default-method', { id })
+      if (!response.success) {
+        this.error = response.message || 'Unable to set default payment method.'
       }
       return response.success
     },

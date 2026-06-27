@@ -33,10 +33,15 @@ export interface TokenPack {
 
 export interface PaymentMethod {
   id: string
+  _id?: string
   brand: string
+  last4?: string
+  expMonth?: number
+  expYear?: number
   label: string
   expiry: string
   isDefault: boolean
+  stripePaymentMethodId?: string
 }
 
 export interface PaymentHistoryItem {

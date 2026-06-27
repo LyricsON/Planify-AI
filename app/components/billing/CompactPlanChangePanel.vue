@@ -119,7 +119,7 @@ const planList = computed(() => {
 })
 
 const currentPlan = computed(() => {
-  return planList.value.find(p => p.id === currentPlanId.value) || planList.value[0]
+  return planList.value.find(p => p.id === currentPlanId.value) || planList.value[0]!
 })
 
 const currentVal = computed(() => {
