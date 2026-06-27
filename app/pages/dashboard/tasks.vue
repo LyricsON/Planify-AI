@@ -89,16 +89,6 @@ async function loadData() {
   loadError.value = ''
   isLoading.value = true
 
-  // Guard: must be authenticated
-  if (import.meta.client) {
-    const token = localStorage.getItem('accessToken') || localStorage.getItem('planify_token')
-    if (!token) {
-      loadError.value = 'You are not signed in. Please sign in to view your tasks.'
-      isLoading.value = false
-      return
-    }
-  }
-
   try {
     const todayStart = new Date()
     todayStart.setHours(0, 0, 0, 0)

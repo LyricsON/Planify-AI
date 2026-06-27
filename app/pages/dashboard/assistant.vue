@@ -390,14 +390,6 @@ async function loadData() {
   isLoadingPage.value = true
   loadError.value = ''
 
-  if (import.meta.client) {
-    const token = localStorage.getItem('accessToken') || localStorage.getItem('planify_token')
-    if (!token) {
-      router.push('/auth/signin')
-      return
-    }
-  }
-
   try {
     const [meRes, coursesRes, filesRes, tokenRes, historyRes] = await Promise.all([
       get<any>('/auth/me'),

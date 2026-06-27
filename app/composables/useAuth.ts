@@ -28,7 +28,7 @@ export function useAuth() {
   async function logout() {
     const { post } = useApi()
     const { signOutFirebase } = useFirebaseAuth()
-    
+
     try {
       await post('/auth/logout')
     } catch (err) {
@@ -43,6 +43,13 @@ export function useAuth() {
       // Clear localStorage tokens
       clearToken()
 
+      try {
+        const dashboardSummary = useDashboardSummary()
+        dashboardSummary.clear()
+      } catch (err) {
+        console.error('Failed to clear dashboard summary:', err)
+      }
+
       // Reset Pinia profile store
       try {
         const profileStore = useProfileStore()
@@ -52,7 +59,7 @@ export function useAuth() {
       }
 
       // Redirect to login page
-      router.push('/auth/signin')
+      await router.replace('/auth/signin')
     }
   }
 
